@@ -70,7 +70,7 @@ async function gorevleriYukle() {
       <td>${g.cikis || bos}</td><td>${g.donus || bos}</td>
       <td>${esc(g.belgeNo) || bos}</td>
       <td class="small">${esc((g.personel || []).join(', '))}</td>
-      <td>${g.onayli ? '<span class="badge text-bg-success">Kontrol edildi</span>' : '<span class="badge text-bg-warning">Kontrol bekliyor</span>'}
+      <td>${g.ornek ? '<span class="badge text-bg-secondary">Örnek</span> ' : ''}${g.onayli ? '<span class="badge text-bg-success">Kontrol edildi</span>' : '<span class="badge text-bg-warning">Kontrol bekliyor</span>'}
           ${g.driveId ? '<i class="bi bi-google text-muted" title="Görüntü Drive\'da"></i>' : g.dosya ? '<i class="bi bi-image text-muted" title="Görüntü sunucuda"></i>' : '<i class="bi bi-image text-danger" title="Görüntü yok"></i>'}</td>
       <td><button class="btn btn-sm btn-link p-0"><i class="bi bi-pencil"></i></button></td>
     </tr>`).join('') : '<tr><td colspan="10" class="text-muted text-center py-4">Bu ay için görev emri yok. JPEG yükleyebilir ya da elle ekleyebilirsiniz.</td></tr>';
@@ -305,6 +305,13 @@ af.addEventListener('submit', async (e) => {
   $('#ayarDurum').textContent = 'Kaydedildi.'; setTimeout(() => { $('#ayarDurum').textContent = ''; }, 2500);
   onerileriYukle();
 });
+$('#ornekSil').addEventListener('click', async () => {
+  if (!confirm('Örnek (uydurma) görev kayıtları silinsin mi? Gerçek kayıtlarınıza dokunulmaz.')) return;
+  const r = await api('/api/ornek-veri', { method: 'DELETE' });
+  bildir(`${r.silinen} örnek kayıt silindi.`);
+  gorevleriYukle(); onerileriYukle();
+});
+
 $('#ornekVeri').addEventListener('click', async () => {
   const r = await api('/api/ornek-veri', { method: 'POST' });
   bildir(`${r.eklenen} görev eklendi. Görüntüleri yüklediğinizde aynı tarihli kayda bağlanır.`);
@@ -329,12 +336,23 @@ $('#driveTest').addEventListener('click', async () => {
   } catch (e) { $('#driveTestSonuc').innerHTML = `<span class="text-danger">${esc(e.message)}</span>`; }
 });
 
+// Drive taraması sunucuda arka planda yürür; ilerleme birkaç saniyede bir sorulur
+const bekle = (ms) => new Promise(r => setTimeout(r, ms));
 $('#driveTara').addEventListener('click', async () => {
   const btn = $('#driveTara'); btn.disabled = true;
-  $('#yukleDurum').innerHTML = '<span class="spinner-border spinner-border-sm"></span> Drive taranıyor, yeni görüntüler OCR\'dan geçiriliyor…';
   try {
-    const o = await api('/api/drive/tara', { method: 'POST' });
-    const satir = [`Drive: ${o.bulunan} görüntü bulundu, ${o.yeni} yeni kayıt, ${o.baglanan} mevcut kayda bağlandı.`];
+    const bas = await api('/api/drive/tara', { method: 'POST' });
+    if (!bas.basladi && !bas.calisiyor) throw new Error('Tarama başlatılamadı.');
+    let d;
+    do {
+      await bekle(2000);
+      d = await api('/api/drive/durum');
+      const ilerleme = d.toplam ? `${d.islenen}/${d.toplam} görüntü OCR'dan geçiriliyor…` : 'Drive klasörü taranıyor…';
+      $('#yukleDurum').innerHTML = `<span class="spinner-border spinner-border-sm"></span> ${ilerleme}`;
+    } while (d.calisiyor);
+    const o = d.sonuc || { bulunan: 0, yeni: 0, baglanan: 0, hata: [], kayitlar: [] };
+    const satir = [`Drive: ${o.bulunan} görüntü bulundu, ${o.yeni} yeni kayıt, ${o.baglanan} mevcut kayıt güncellendi.`];
+    if (o.bulunan && !o.yeni && !o.baglanan && !o.hata.length) satir.push('Yeni görüntü yok; daha önce işlenenler atlandı.');
     o.kayitlar.forEach(k => satir.push(`${esc(k.dosya)}: ${esc(k.durum)}${k.tarih ? ` (${tarihTR(k.tarih)})` : ''}`));
     o.hata.forEach(h => satir.push(`<span class="text-danger">${esc(h)}</span>`));
     $('#yukleDurum').innerHTML = satir.join('<br>');

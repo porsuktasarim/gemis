@@ -109,14 +109,27 @@ async function gorselGetir(g) {
   return null;
 }
 
-// OCR sonucunu, aynı tarihte görüntüsü olmayan bir kayda bağla ya da yeni kayıt aç
+// OCR sonucunu kayda işle.
+// Eşleşme: önce sayı (her görev emrine özgü), yoksa aynı tarihli ve görüntüsü olmayan kayıt. Örnek kayıtlar eşleşmez.
+// Kontrol edilmemiş kayıtta yeni OCR sonucu öncekinin üzerine yazılır; kontrol edilmiş kayıtta yalnızca boş alanlar doldurulur.
+const OCR_ALANLARI = ['tarih', 'sayi', 'belgeNo', 'yerHam', 'yer', 'plaka', 'surucu', 'personel', 'cikis', 'donus'];
+const dolu = (v) => Array.isArray(v) ? v.length > 0 : !!v;
+
 async function kaydaIsle(okunan, gorselAlanlari) {
-  const bos = { dosya: { $in: [null, ''] }, driveId: { $in: [null, ''] } };
-  let kayit = okunan.tarih ? await Gorev.findOne({ tarih: okunan.tarih, ...bos }) : null;
+  // Bu sürümden önce içe aktarılan örnek kayıtlar işaretsiz olabilir; uydurma sayı öneklerinden tanınır
+  const gercek = { ornek: { $ne: true }, sayi: { $not: /^E-00000000-/ } };
+  let kayit = okunan.sayi ? await Gorev.findOne({ sayi: okunan.sayi, ...gercek }) : null;
+  if (!kayit && okunan.tarih) {
+    kayit = await Gorev.findOne({ tarih: okunan.tarih, dosya: { $in: [null, ''] }, driveId: { $in: [null, ''] }, ...gercek });
+  }
   if (kayit) {
+    for (const k of OCR_ALANLARI) {
+      if (!dolu(okunan[k])) continue;
+      if (!kayit.onayli || !dolu(kayit[k])) kayit[k] = okunan[k];
+    }
     Object.assign(kayit, gorselAlanlari, { ocrMetin: okunan.ocrMetin });
     await kayit.save();
-    return { kayit, durum: 'mevcut kayda bağlandı' };
+    return { kayit, durum: kayit.onayli ? 'mevcut kayda bağlandı (boş alanlar dolduruldu)' : 'mevcut kayıt OCR ile güncellendi' };
   }
   kayit = await Gorev.create({ ...okunan, ...gorselAlanlari, onayli: false });
   return { kayit, durum: 'yeni kayıt (kontrol bekliyor)' };
@@ -161,10 +174,11 @@ app.get('/api/gorevler/:id/gorsel', hata(async (req, res) => {
 
 // Elle yükleme + OCR. Görüntü bellekte işlenir; yalnızca saklama seçeneği açıksa diske yazılır.
 app.post('/api/gorevler/yukle', yukle.array('dosyalar', 60), hata(async (req, res) => {
+  if (!req.files?.length) return res.status(400).json({ hata: 'Dosya alınamadı. Yalnızca JPEG ve PNG görüntüler okunabilir.' });
   const ayar = await ayarGetir();
   const baglam = await ocrBaglami();
   const sonuc = [];
-  for (const f of req.files || []) {
+  for (const f of req.files) {
     const ad = Buffer.from(f.originalname, 'latin1').toString('utf8');
     const okunan = await gorevOku(f.buffer, ad, baglam);
     const alanlar = ayar.gorselSakla ? { dosya: yerelKaydet(f.buffer, ad) } : {};
@@ -187,7 +201,7 @@ app.get('/api/oneriler', hata(async (req, res) => {
 }));
 
 // ---------- Google Drive ----------
-const taramaDurumu = { calisiyor: false, son: null, sonuc: null };
+const taramaDurumu = { calisiyor: false, son: null, sonuc: null, toplam: 0, islenen: 0 };
 
 async function driveTara() {
   if (taramaDurumu.calisiyor) throw new Error('Tarama zaten sürüyor.');
@@ -195,13 +209,17 @@ async function driveTara() {
   const kok = drive.klasorKimligi(ayar.driveKlasor);
   if (!kok) throw new Error('Ayarlar\'da Drive klasörü girilmemiş.');
   taramaDurumu.calisiyor = true;
-  const ozet = { bulunan: 0, yeni: 0, baglanan: 0, hata: [] , kayitlar: [] };
+  taramaDurumu.toplam = 0; taramaDurumu.islenen = 0;
+  const ozet = { bulunan: 0, yeni: 0, baglanan: 0, hata: [], kayitlar: [] };
   try {
     const dosyalar = await drive.gorselleriBul(kok);
     ozet.bulunan = dosyalar.length;
     const islenmis = new Set((await Gorev.distinct('driveId')).filter(Boolean));
     const baglam = await ocrBaglami();
-    for (const f of dosyalar.filter(x => !islenmis.has(x.id))) {
+    const yeniler = dosyalar.filter(x => !islenmis.has(x.id));
+    taramaDurumu.toplam = yeniler.length;
+    for (const f of yeniler) {
+      taramaDurumu.islenen++;
       try {
         const buf = await drive.indir(f.id);
         const ad = f.yol ? `${f.yol}/${f.name}` : f.name;
@@ -212,6 +230,8 @@ async function driveTara() {
         ozet.kayitlar.push({ id: kayit._id, dosya: ad, durum, tarih: kayit.tarih });
       } catch (e) { ozet.hata.push(`${f.name}: ${e.message}`); }
     }
+  } catch (e) {
+    ozet.hata.push(e.response?.data?.error?.message || e.message);
   } finally {
     taramaDurumu.calisiyor = false;
     taramaDurumu.son = new Date();
@@ -224,7 +244,8 @@ app.get('/api/drive/durum', hata(async (req, res) => {
   const ayar = await ayarGetir();
   res.json({
     tanimli: drive.tanimli(), eposta: drive.hesapEposta(), klasor: ayar.driveKlasor || '',
-    calisiyor: taramaDurumu.calisiyor, son: taramaDurumu.son, sonuc: taramaDurumu.sonuc
+    calisiyor: taramaDurumu.calisiyor, son: taramaDurumu.son, sonuc: taramaDurumu.sonuc,
+    toplam: taramaDurumu.toplam, islenen: taramaDurumu.islenen
   });
 }));
 
@@ -236,7 +257,15 @@ app.post('/api/drive/test', hata(async (req, res) => {
   res.json({ ad: bilgi.name, gorselSayisi: gorseller.length });
 }));
 
-app.post('/api/drive/tara', hata(async (req, res) => res.json(await driveTara())));
+// Tarama arka planda yürür (Cloudflare gibi vekillerin 100 sn istek sınırına takılmaması için);
+// arayüz ilerlemeyi /api/drive/durum ile izler.
+app.post('/api/drive/tara', hata(async (req, res) => {
+  if (taramaDurumu.calisiyor) return res.json({ basladi: false, calisiyor: true });
+  const ayar = await ayarGetir();
+  if (!drive.klasorKimligi(ayar.driveKlasor)) return res.status(400).json({ hata: 'Ayarlar\'da Drive klasörü girilmemiş.' });
+  driveTara().catch(e => console.error('Drive taraması:', e.message));
+  res.json({ basladi: true });
+}));
 
 // Otomatik tarama: her dakika ayarı kontrol eder
 setInterval(async () => {
@@ -270,11 +299,16 @@ app.put('/api/kisiler', hata(async (req, res) => {
 app.post('/api/ornek-veri', hata(async (req, res) => {
   let eklenen = 0;
   for (const g of varsayilan.ornek) {
-    if (await Gorev.exists({ tarih: g.tarih, sayi: g.sayi })) continue;
-    await Gorev.create({ ...g, yer: yerAyristir(g.yerHam) });
+    if (await Gorev.exists({ tarih: g.tarih, sayi: g.sayi, ornek: true })) continue;
+    await Gorev.create({ ...g, yer: yerAyristir(g.yerHam), ornek: true });
     eklenen++;
   }
   res.json({ eklenen });
+}));
+
+app.delete('/api/ornek-veri', hata(async (req, res) => {
+  const r = await Gorev.deleteMany({ $or: [{ ornek: true }, { sayi: /^E-00000000-/ }] });
+  res.json({ silinen: r.deletedCount });
 }));
 
 // ---------- İcmaller ----------

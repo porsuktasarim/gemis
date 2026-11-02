@@ -18,7 +18,8 @@ const GorevSchema = new mongoose.Schema({
   driveId: { type: String, index: true },       // Drive'dan alınan görüntünün dosya kimliği (görüntü sunucuda tutulmaz)
   driveAd: String,                              // Drive'daki dosya adı / alt klasör yolu
   ocrMetin: String,
-  onayli: { type: Boolean, default: false }
+  onayli: { type: Boolean, default: false },
+  ornek: { type: Boolean, default: false }          // uydurma örnek veri (gerçek belgelerle eşleştirilmez)
 }, { timestamps: true });
 
 // unvan: seçim listesinde "Ad SOYAD - Görevi" olarak görünen görev (Mühendis, Şoför…), imza/puantaj ünvanı
