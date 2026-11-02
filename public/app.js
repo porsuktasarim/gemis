@@ -15,12 +15,31 @@ const bildir = (m) => { $('#bildirim .toast-body').textContent = m; bildirim.sho
 const buAy = new Date().toISOString().slice(0, 7);
 const gecenAy = (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); })();
 
-// ---------- Sekmeler ----------
-document.querySelectorAll('[data-sekme]').forEach(b => b.addEventListener('click', () => {
-  document.querySelectorAll('[data-sekme]').forEach(x => x.classList.toggle('active', x === b));
-  document.querySelectorAll('main > section').forEach(s => { s.hidden = s.id !== `sekme-${b.dataset.sekme}`; });
-  if (b.dataset.sekme === 'ayarlar') ayarlariYukle();
-}));
+// ---------- Sekmeler (sol menü) ----------
+const SEKME_ADI = { gorevler: 'Görev Emirleri', icmaller: 'İcmaller', ayarlar: 'Ayarlar' };
+function sekmeAc(ad) {
+  document.querySelectorAll('.sidebar-menu [data-sekme]').forEach(x => x.classList.toggle('active', x.dataset.sekme === ad));
+  document.querySelectorAll('section.sekme').forEach(s => { s.hidden = s.id !== `sekme-${ad}`; });
+  $('#sayfaBaslik').textContent = SEKME_ADI[ad]; $('#sayfaYol').textContent = SEKME_ADI[ad];
+  document.body.classList.remove('sidebar-open'); // mobilde menüyü kapat
+  if (ad === 'ayarlar') ayarlariYukle();
+}
+document.querySelectorAll('[data-sekme]').forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); sekmeAc(b.dataset.sekme); }));
+
+// ---------- Tema ----------
+$('#temaDegistir').addEventListener('click', (e) => {
+  e.preventDefault();
+  const yeni = document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-bs-theme', yeni);
+  try { localStorage.setItem('gemis-tema', yeni); } catch (err) { /* tarayıcı depolaması kapalı */ }
+});
+
+// Personel adı (özet kutuları ve üst çubuk için)
+let personelAd = '';
+async function personelYukle() {
+  try { personelAd = (await api('/api/ayarlar')).personelAd || ''; } catch { personelAd = ''; }
+  $('#ustPersonel').innerHTML = personelAd ? `<i class="bi bi-person-circle me-1"></i>${esc(personelAd)}` : '';
+}
 
 // ---------- Öneriler ----------
 async function onerileriYukle() {
@@ -36,10 +55,15 @@ $('#gorevAy').addEventListener('change', gorevleriYukle);
 
 async function gorevleriYukle() {
   const liste = await api(`/api/gorevler?ay=${$('#gorevAy').value}`);
+  const eksikMi = (g) => !g.yer?.length || !g.plaka || !g.surucu || !g.cikis || !g.donus;
+  $('#ozToplam').textContent = liste.length;
+  $('#ozBekleyen').textContent = liste.filter(g => !g.onayli).length;
+  $('#ozSurucu').textContent = liste.filter(g => personelAd && (g.surucu || '').toLocaleLowerCase('tr') === personelAd.toLocaleLowerCase('tr')).length;
+  $('#ozEksik').textContent = liste.filter(eksikMi).length;
   const bos = '<span class="eksik">—</span>';
   $('#gorevTablo').innerHTML = liste.length ? liste.map(g => `
     <tr data-id="${g._id}">
-      <td class="text-nowrap">${tarihTR(g.tarih) || bos}</td>
+      <td class="text-nowrap ps-3">${tarihTR(g.tarih) || bos}</td>
       <td>${esc(yerYaz(g.yer)) || bos}</td>
       <td>${esc(g.surucu) || bos}</td>
       <td class="text-nowrap">${esc(g.plaka) || bos}</td>
@@ -257,6 +281,7 @@ af.addEventListener('submit', async (e) => {
   const kisiler = $('#kisilerAlan').value.split('\n').map(s => s.split(';').map(x => x.trim())).filter(p => p[0]).map(p => ({ ad: p[0], unvan: p[1] || '' }));
   await api('/api/ayarlar', { method: 'PUT', body: JSON.stringify(veri) });
   await api('/api/kisiler', { method: 'PUT', body: JSON.stringify(kisiler) });
+  await personelYukle(); gorevleriYukle();
   $('#ayarDurum').textContent = 'Kaydedildi.'; setTimeout(() => { $('#ayarDurum').textContent = ''; }, 2500);
   onerileriYukle();
 });
@@ -299,4 +324,4 @@ $('#driveTara').addEventListener('click', async () => {
   btn.disabled = false;
 });
 
-gorevleriYukle(); onerileriYukle(); driveDurumYukle();
+personelYukle().then(gorevleriYukle); onerileriYukle(); driveDurumYukle();

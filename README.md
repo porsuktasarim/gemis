@@ -52,6 +52,15 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
   - Sayı alanı için her şablonun kendi `sablon_sayi-…` parçası Ayarlar'a
     yapıştırılır.
 
+## Arayüz
+
+Arayüz [AdminLTE 4](https://adminlte.io/themes/v4/) temasıyla hazırlanmıştır:
+- Sol menü, üst çubuk ve kart düzeni
+- Görev Emirleri sayfasında seçili ayın özet kutuları
+- Açık/koyu tema seçimi
+
+AdminLTE, Bootstrap Icons ve OverlayScrollbars npm paketlerinden sunulur. İnternet (CDN) bağlantısı gerekmez.
+
 ## Kurulum
 
 Windows'ta Docker Desktop (WSL 2), Linux'ta Docker Engine ve Compose eklentisi
@@ -173,6 +182,6 @@ src/util.js          Türkçe metin, tarih, ilçe/mahalle ayrıştırma
 src/icmal/           İcmal HTML/Excel üreticileri
 src/disaktar.js      .xlsx ve PDF üretimi
 src/models.js        MongoDB şemaları ve varsayılan ayarlar
-public/              Arayüz (Bootstrap 5)
+public/              Arayüz (AdminLTE 4 / Bootstrap 5)
 seed/varsayilan.js   Tatiller, mahalli dışı yerler, uydurma örnek veriler
 ```

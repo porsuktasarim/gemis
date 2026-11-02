@@ -22,6 +22,8 @@ const app = express();
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/vendor/bootstrap', express.static(path.join(__dirname, '..', 'node_modules', 'bootstrap', 'dist')));
+app.use('/vendor/adminlte', express.static(path.join(__dirname, '..', 'node_modules', 'admin-lte', 'dist')));
+app.use('/vendor/overlayscrollbars', express.static(path.join(__dirname, '..', 'node_modules', 'overlayscrollbars')));
 app.use('/vendor/icons', express.static(path.join(__dirname, '..', 'node_modules', 'bootstrap-icons', 'font')));
 
 // Yüklenen dosyalar bellekte tutulur; diske yalnızca saklama seçeneği açıksa yazılır.
