@@ -11,8 +11,18 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
 
 - **Görev emri yükleme**
   - JPEG/PNG görüntüler toplu olarak yüklenebilir.
-  - OCR basılı alanları doldurur: sayı, görev tarihi, görevli personel ve
-    gideceği yer.
+  - OCR **bölgesel** çalışır. Formdaki tablo çizgileri ve etiketler ("Plakası",
+    "Sürücünün Adı Soyadı", "Gideceği Yer", "Çıkış Saati" …) bulunur, her alanın
+    değer hücresi ayrı kesilip okunur. Rakam alanlarında yalnızca rakam kabul edilir.
+  - Örnek belgelerde ölçülen doğruluk (10 belge):
+
+    | Alan | Doğru |
+    |---|---|
+    | Sayı | 10 |
+    | Görev tarihi | 9 |
+    | Gideceği yer | 9 |
+    | Görevli personel | 9 |
+    | El yazısı alanlar | Tesseract ile okunamıyor |
   - El yazısı alanlar (sürücü, plaka, saatler, belge no) çoğunlukla okunamaz.
     Bu alanlar formdan girilir; daha önce girilen plaka ve kişiler öneri olarak
     gelir.
@@ -31,6 +41,10 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
   - "Büyükçekmece-Tepecik, Bağcılar" gibi metinler İstanbul ilçe listesine göre
     ilçe/mahalle olarak ayrıştırılır.
   - Kısaltmalar (B.Çekmece vb.) tanınır.
+- **Personel seçimi**
+  - Her icmal seçilen kişi için ayrı hazırlanır. Seçim "Ad SOYAD - Görevi" biçimindedir; şoförler de seçilebilir.
+  - Yalnızca o kişinin görevli personel ya da sürücü olarak bulunduğu görev emirleri, onun adı ve ünvanlarıyla icmale girer.
+  - Görev emirleri listesinde "Tüm kişiler" de seçilebilir.
 - **İcmaller**
 
   | İcmal | Kapsam |
@@ -153,7 +167,7 @@ MONGO_URL=mongodb://localhost:27017/gemis npm start
    - Resmî tatiller (dini bayram tarihleri her yıl Resmî Gazete'den
      doğrulanmalıdır)
    - Mahalli dışı yerler
-   - Kişi listesi
+   - Kişi listesi. Her satıra şu biçimde yazılır: `Ad SOYAD; Görevi; Cetvel ünvanı; Seyyar ünvanı`. Örnek: `Ali YILMAZ; Mühendis; Ziraat Mühendisi; Ziraat Yüksek Mühendisi`. Kişi listesi OCR'ın personel ve sürücü adlarını eşleştirmesi için de gereklidir.
 2. Denemek için **"Örnek (uydurma) veriyi içe aktar"** ile Ekim 2026'ya ait 10
    uydurma görev yüklenebilir.
 3. **Görev Emirleri** sekmesinde JPEG'ler yüklenir. Her kayıt açılıp kontrol

@@ -121,7 +121,7 @@ ${PUANTAJ_DIPNOT}
 <p>&nbsp;</p>
 `;
   return {
-    baslik: `Puantaj ${AY} ${yil}`,
+    baslik: `Puantaj ${AY} ${yil} - ${ayar.personelAd}`,
     html,
     excel: {
       baslik: 'Kontrol Hizmetlerine İlişkin Puantaj Tablosu (EK-1)',
@@ -202,7 +202,7 @@ ${satirHtml}
 ${imzaHtml(bit.slice(0, 4))}
 `;
   return {
-    baslik: `Ek Özel Hizmet ${ayAraligiMetni(bas, bit)}`,
+    baslik: `Ek Özel Hizmet ${ayAraligiMetni(bas, bit)} - ${ayar.personelAd}`,
     html,
     excel: {
       baslik: 'EK ÖZEL HİZMET TAZMİNATINA ESAS AYLIK ARAZİ GERÇEKLEŞME CETVELİ',
@@ -302,7 +302,7 @@ function arac(ayar, gorevler, { bas, bit }) {
   const donem = ayAraligiMetni(bas, bit);
   const baslik = 'GÖREVLERİNİ ARAÇ KULLANARAK YERİNE GETİREN KAMU GÖREVLİLERİNE İLAVE ÜCRET GERÇEKLEŞME CETVELİ';
   return {
-    baslik: `Araç Kullanma ${donem}`,
+    baslik: `Araç Kullanma ${donem} - ${ayar.personelAd}`,
     html: aracSablonu(ayar, {
       baslikMetni: 'GÖREVLERİNİ ARAÇ KULLANARAK YERİNE GETİREN KAMU GÖREVLİLERİNE İLAVE ÜCRET&nbsp;GERÇEKLEŞME CETVELİ&nbsp;',
       donem: esc(donem).replace(/ (\d{4})$/, '&nbsp;$1'), sayiHtml: ayar.sayiArac, unvan: ayar.personelUnvanCetvel, satirlar, yil: bit.slice(0, 4)
@@ -327,7 +327,7 @@ function seyyar(ayar, gorevler, { bas, bit, donemMetni }) {
   }
   const donem = donemMetni || ayAraligiMetni(bas, bit);
   return {
-    baslik: `Seyyar Görev ${donem}`,
+    baslik: `Seyyar Görev ${donem} - ${ayar.personelAd}`,
     html: aracSablonu(ayar, {
       baslikMetni: 'SEYYAR GÖREV TAZMİNATINA ESAS AYLIK ARAZİ ÇIKIŞ CETVELİ&nbsp;',
       donem: esc(donem), sayiHtml: ayar.sayiSeyyar, unvan: ayar.personelUnvanSeyyar, satirlar, yil: bit.slice(0, 4)
@@ -339,12 +339,13 @@ function seyyar(ayar, gorevler, { bas, bit, donemMetni }) {
 }
 
 // ---------------- KİŞİ BAZINDA LİSTE ----------------
-function liste(ayar, gorevler, { bas, bit }) {
+function liste(ayar, gorevler, { bas, bit, tumKisiler }) {
   const sat = [];
+  const kisiMi = (a) => tumKisiler || sade(a) === sade(ayar.personelAd);
   for (const g of gorevler) {
     const ortak = [tarihTR(g.tarih), yerYaz(g.yer) || g.yerHam || '', g.plaka || '', g.cikis || '', g.donus || '', g.belgeNo || ''];
-    if (g.surucu) sat.push([g.surucu, 'Sürücü', g.tarih, ...ortak]);
-    for (const p of g.personel || []) sat.push([p, 'Görevli Personel', g.tarih, ...ortak]);
+    if (g.surucu && kisiMi(g.surucu)) sat.push([g.surucu, 'Sürücü', g.tarih, ...ortak]);
+    for (const p of g.personel || []) if (kisiMi(p)) sat.push([p, 'Görevli Personel', g.tarih, ...ortak]);
   }
   sat.sort((a, b) => a[0].localeCompare(b[0], 'tr') || a[2].localeCompare(b[2]) || (a[1] === 'Sürücü' ? -1 : 1));
   const satirlar = sat.map(s => [s[0], s[1], ...s.slice(3)]);
@@ -357,7 +358,7 @@ ${satirlar.map(r => `		<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).j
 </table>
 `;
   return {
-    baslik: `Görev Listesi ${ayAraligiMetni(bas, bit)}`,
+    baslik: `Görev Listesi ${ayAraligiMetni(bas, bit)}${tumKisiler ? '' : ` - ${ayar.personelAd}`}`,
     html,
     excel: { baslik: `Görev Emirleri – ${ayAraligiMetni(bas, bit)}`, bilgi: [], basliklar, satirlar, genislik: [24, 18, 13, 44, 13, 11, 11, 11], imzasiz: true },
     gorevler,
@@ -412,7 +413,12 @@ function icmalUret(tur, ayar, gorevler, secenek) {
   if (!f) throw new Error('Bilinmeyen icmal türü');
   if (tur === 'puantaj') secenek.bit = secenek.bas;
   const ayList = aylar(secenek.bas, secenek.bit);
-  const kapsam = gorevler.filter(g => ayList.includes((g.tarih || '').slice(0, 7))).sort((a, b) => a.tarih.localeCompare(b.tarih));
+  const ayaGore = gorevler.filter(g => ayList.includes((g.tarih || '').slice(0, 7)));
+  // Seçilen kişinin (görevli personel ya da sürücü olarak) bulunduğu görevler; liste "tüm kişiler" ile hepsini alır
+  const tumu = tur === 'liste' && secenek.tumKisiler;
+  const ad = sade(ayar.personelAd);
+  const kapsam = (tumu ? ayaGore : ayaGore.filter(g => sade(g.surucu) === ad || (g.personel || []).some(p => sade(p) === ad)))
+    .sort((a, b) => a.tarih.localeCompare(b.tarih));
   return f(ayar, kapsam, secenek);
 }
 

@@ -21,7 +21,13 @@ const GorevSchema = new mongoose.Schema({
   onayli: { type: Boolean, default: false }
 }, { timestamps: true });
 
-const KisiSchema = new mongoose.Schema({ ad: { type: String, unique: true }, unvan: String });
+// unvan: seçim listesinde "Ad SOYAD - Görevi" olarak görünen görev (Mühendis, Şoför…), imza/puantaj ünvanı
+const KisiSchema = new mongoose.Schema({
+  ad: { type: String, unique: true },
+  unvan: String,
+  unvanCetvel: String,   // ek özel / araç cetvelindeki ünvan (boşsa unvan)
+  unvanSeyyar: String    // seyyar cetvelindeki ünvan (boşsa cetvel ünvanı)
+});
 
 const TatilSchema = new mongoose.Schema({ tarih: String, ad: String, yarim: Boolean }, { _id: false });
 const MdSchema = new mongoose.Schema({ ilce: String, mahalleler: [String], not: String }, { _id: false });

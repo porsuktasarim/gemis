@@ -45,12 +45,13 @@ const mahalliDisi = [
   ['Şile', 'Ağaçdere, Akçakese, Avcıkoru, Bıçkıdere, Bozgoca, Çataklı, Çelebi, Çengilli, Darlık, Değirmençayırı, Erenler, Esenceli, Geredeli, Gökmaslı, Göksu, Hacılı, Hasanlı, İmrendere, İmrenli, İsaköy, Kabakoz, Kadıköy, Kalemköy, Karabeyli, Karacaköy, Karakiraz, Karamandere, Kervansaray, Kızılcaköy, Korucu, Kömürlük, Kurna, Oruçoğlu, Osmanköy, Ovacık, Satmazlı, Sofular, Soğullu, Sortullu, Şuayipli, Tekeköy, Ulupelit, Üvezli, Yaka, Yaylalı, Yazımanayır, Yeniköy, Yeşilvadi']
 ].map(([ilce, m, not]) => ({ ilce, mahalleler: m.split(',').map(s => s.trim()), not: not || '' }));
 
+const ZM = ['Ziraat Mühendisi', 'Ziraat Mühendisi'], ZYM = ['Ziraat Mühendisi', 'Ziraat Yüksek Mühendisi'];
 const kisiler = [
-  ['Ali YILMAZ', 'Mühendis'], ['Ayşe KAYA', 'Mühendis'], ['Mehmet DEMİR', 'Mühendis'],
-  ['Zeynep ŞAHİN', 'Mühendis'], ['Can ÖZTÜRK', 'Mühendis'], ['Elif AYDIN', 'Mühendis'],
-  ['Murat ÇELİK', 'Mühendis'], ['Selin ARSLAN', 'İşçi'],
-  ['Hakan KOÇ', 'Şoför'], ['Emre KURT', 'Şoför']
-].map(([ad, unvan]) => ({ ad, unvan }));
+  ['Ali YILMAZ', 'Mühendis', ...ZYM], ['Ayşe KAYA', 'Mühendis', ...ZM], ['Mehmet DEMİR', 'Mühendis', ...ZM],
+  ['Zeynep ŞAHİN', 'Mühendis', ...ZM], ['Can ÖZTÜRK', 'Mühendis', ...ZM], ['Elif AYDIN', 'Mühendis', ...ZM],
+  ['Murat ÇELİK', 'Mühendis', ...ZM], ['Selin ARSLAN', 'İşçi', 'Sürekli İşçi', 'Sürekli İşçi'],
+  ['Hakan KOÇ', 'Şoför', 'Şoför', 'Şoför'], ['Emre KURT', 'Şoför', 'Şoför', 'Şoför']
+].map(([ad, unvan, unvanCetvel, unvanSeyyar]) => ({ ad, unvan, unvanCetvel, unvanSeyyar }));
 
 // Uydurma örnek görev emirleri (gerçek kişi, plaka ve evrakla ilgisi yoktur).
 // Ayarlar ekranındaki "Örnek veriyi içe aktar" düğmesiyle yüklenir.

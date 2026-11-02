@@ -191,8 +191,23 @@ let sonIcmal = null;
 })();
 $('#icmalBas').value = gecenAy; $('#icmalBit').value = gecenAy;
 $('#icmalBas').addEventListener('change', () => { if ($('#icmalBit').value < $('#icmalBas').value) $('#icmalBit').value = $('#icmalBas').value; });
+// Personel seçimi: "Ad SOYAD - Görevi"; görev listesinde "tüm kişiler" de seçilebilir
+async function kisiSecimiYukle() {
+  const kisiler = await api('/api/kisiler');
+  const onceki = $('#icmalKisi').value;
+  $('#icmalKisi').innerHTML = '<option value="*" data-tum>— Tüm kişiler —</option>' +
+    kisiler.map(k => `<option value="${esc(k.ad)}">${esc(k.ad)} - ${esc(k.unvan || 'görevi girilmemiş')}</option>`).join('');
+  $('#icmalKisi').value = [...$('#icmalKisi').options].some(o => o.value === onceki) ? onceki : (personelAd || kisiler[0]?.ad || '');
+  turDegisti();
+}
+
 function turDegisti() {
   const t = $('#icmalTur').value;
+  const tum = $('#icmalKisi option[data-tum]');
+  if (tum) {
+    tum.hidden = t !== 'liste';
+    if (t !== 'liste' && $('#icmalKisi').value === '*') $('#icmalKisi').value = personelAd || $('#icmalKisi').options[1]?.value || '';
+  }
   $('#bitKutu').hidden = t === 'puantaj';
   $('#haricKutu').hidden = t !== 'puantaj';
   $('#donemKutu').hidden = t !== 'seyyar';
@@ -201,7 +216,7 @@ $('#icmalTur').addEventListener('change', turDegisti);
 
 function sorgu() {
   const t = $('#icmalTur').value;
-  const p = new URLSearchParams({ bas: $('#icmalBas').value, bit: t === 'puantaj' ? $('#icmalBas').value : $('#icmalBit').value });
+  const p = new URLSearchParams({ bas: $('#icmalBas').value, bit: t === 'puantaj' ? $('#icmalBas').value : $('#icmalBit').value, kisi: $('#icmalKisi').value || '' });
   const haric = $('#icmalHaric').value.split(/[,;\s]+/).map(tarihISO).filter(Boolean);
   if (t === 'puantaj' && haric.length) p.set('haric', haric.join(','));
   if (t === 'seyyar' && $('#icmalDonem').value.trim()) p.set('donem', $('#icmalDonem').value.trim());
@@ -265,7 +280,11 @@ async function ayarlariYukle() {
   af.tatiller.value = (a.tatiller || []).sort((x, y) => x.tarih.localeCompare(y.tarih))
     .map(t => [tarihTR(t.tarih), t.ad, t.yarim ? 'yarım' : ''].filter(Boolean).join('; ')).join('\n');
   af.mahalliDisi.value = (a.mahalliDisi || []).map(m => `${m.ilce}: ${m.mahalleler.join(', ')}`).join('\n');
-  $('#kisilerAlan').value = kisiler.map(k => [k.ad, k.unvan].filter(Boolean).join('; ')).join('\n');
+  $('#kisilerAlan').value = kisiler.map(k => {
+    const p = [k.ad, k.unvan || '', k.unvanCetvel || '', k.unvanSeyyar || ''];
+    while (p.length > 1 && !p[p.length - 1]) p.pop();
+    return p.join('; ');
+  }).join('\n');
   driveDurumYukle();
 }
 af.addEventListener('submit', async (e) => {
@@ -278,10 +297,11 @@ af.addEventListener('submit', async (e) => {
     .map(p => ({ tarih: tarihISO(p[0]), ad: p[1] || '', yarim: /yar[ıi]m/i.test(p[2] || '') }));
   veri.mahalliDisi = af.mahalliDisi.value.split('\n').map(s => s.split(':')).filter(p => p[0].trim() && p[1])
     .map(p => ({ ilce: p[0].trim(), mahalleler: p.slice(1).join(':').split(',').map(x => x.trim()).filter(Boolean) }));
-  const kisiler = $('#kisilerAlan').value.split('\n').map(s => s.split(';').map(x => x.trim())).filter(p => p[0]).map(p => ({ ad: p[0], unvan: p[1] || '' }));
+  const kisiler = $('#kisilerAlan').value.split('\n').map(s => s.split(';').map(x => x.trim())).filter(p => p[0])
+    .map(p => ({ ad: p[0], unvan: p[1] || '', unvanCetvel: p[2] || '', unvanSeyyar: p[3] || '' }));
   await api('/api/ayarlar', { method: 'PUT', body: JSON.stringify(veri) });
   await api('/api/kisiler', { method: 'PUT', body: JSON.stringify(kisiler) });
-  await personelYukle(); gorevleriYukle();
+  await personelYukle(); gorevleriYukle(); kisiSecimiYukle();
   $('#ayarDurum').textContent = 'Kaydedildi.'; setTimeout(() => { $('#ayarDurum').textContent = ''; }, 2500);
   onerileriYukle();
 });
@@ -324,4 +344,4 @@ $('#driveTara').addEventListener('click', async () => {
   btn.disabled = false;
 });
 
-personelYukle().then(gorevleriYukle); onerileriYukle(); driveDurumYukle();
+personelYukle().then(() => { gorevleriYukle(); kisiSecimiYukle(); }); onerileriYukle(); driveDurumYukle();

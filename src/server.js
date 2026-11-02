@@ -83,8 +83,9 @@ async function ocrBaglami() {
       for (const m of y.mahalleler) if (!bilinenMahalleler[y.ilce].includes(m)) bilinenMahalleler[y.ilce].push(m);
     }
   }
+  const bilinenPlakalar = (await Gorev.distinct('plaka')).filter(Boolean);
   return {
-    kisiler, bilinenMahalleler, sayiOnek: ayar.sayiOnek || '',
+    kisiler, bilinenMahalleler, bilinenPlakalar, sayiOnek: ayar.sayiOnek || '',
     amirler: [ayar.subeMuduruAd, ayar.ilMudYrdAd, ...(ayar.ocrHaricAdlar || [])].filter(a => a && a !== 'Ad SOYAD')
   };
 }
@@ -258,7 +259,9 @@ app.put('/api/ayarlar', hata(async (req, res) => {
 }));
 app.get('/api/kisiler', hata(async (req, res) => res.json(await Kisi.find().sort({ ad: 1 }).lean())));
 app.put('/api/kisiler', hata(async (req, res) => {
-  const liste = (req.body || []).filter(k => k.ad?.trim()).map(k => ({ ad: k.ad.trim(), unvan: (k.unvan || '').trim() }));
+  const liste = (req.body || []).filter(k => k.ad?.trim()).map(k => ({
+    ad: k.ad.trim(), unvan: (k.unvan || '').trim(), unvanCetvel: (k.unvanCetvel || '').trim(), unvanSeyyar: (k.unvanSeyyar || '').trim()
+  }));
   await Kisi.deleteMany({});
   await Kisi.insertMany(liste, { ordered: false }).catch(() => {});
   res.json(await Kisi.find().sort({ ad: 1 }).lean());
@@ -278,12 +281,30 @@ app.post('/api/ornek-veri', hata(async (req, res) => {
 function secenekler(q) {
   const bas = q.bas, bit = q.bit || q.bas;
   if (!/^\d{4}-\d{2}$/.test(bas || '') || !/^\d{4}-\d{2}$/.test(bit)) throw new Error('Ay seçiniz');
-  return { bas, bit, haric: (q.haric || '').split(',').map(s => s.trim()).filter(Boolean), donemMetni: q.donem || '' };
+  return {
+    bas, bit, haric: (q.haric || '').split(',').map(s => s.trim()).filter(Boolean), donemMetni: q.donem || '',
+    kisi: (q.kisi || '').trim(), tumKisiler: q.kisi === '*'
+  };
 }
+
+// Seçilen kişinin adı ve ünvanlarıyla ayarları birleştir. Kişi seçilmemişse Ayarlar'daki varsayılan personel.
+async function kisiAyari(ayar, ad) {
+  if (!ad || ad === '*' || ad === ayar.personelAd) {
+    const k = await Kisi.findOne({ ad: ayar.personelAd }).lean();
+    return k?.unvanCetvel || k?.unvanSeyyar ? { ...ayar, personelUnvanCetvel: k.unvanCetvel || ayar.personelUnvanCetvel, personelUnvanSeyyar: k.unvanSeyyar || ayar.personelUnvanSeyyar } : ayar;
+  }
+  const k = await Kisi.findOne({ ad }).lean();
+  if (!k) throw new Error(`Kişi bulunamadı: ${ad}`);
+  const unvan = k.unvan || '';
+  const cetvel = k.unvanCetvel || unvan;
+  return { ...ayar, personelAd: k.ad, personelUnvan: unvan, personelUnvanCetvel: cetvel, personelUnvanSeyyar: k.unvanSeyyar || cetvel };
+}
+
 async function icmalHazirla(req) {
-  const ayar = await ayarGetir();
+  const sec = secenekler(req.query);
+  const ayar = await kisiAyari(await ayarGetir(), sec.kisi);
   const gorevler = await Gorev.find({}, { ocrMetin: 0 }).lean();
-  return { ayar, icmal: icmalUret(req.params.tur, ayar, gorevler, secenekler(req.query)) };
+  return { ayar, icmal: icmalUret(req.params.tur, ayar, gorevler, sec) };
 }
 const dosyaAdi = (s) => s.replace(/[^\wçğıöşüÇĞİÖŞÜ -]/g, '').replace(/\s+/g, '_');
 

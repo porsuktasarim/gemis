@@ -131,6 +131,10 @@
                   <select id="icmalTur" class="form-select form-select-sm"></select>
                 </div>
                 <div class="col-auto">
+                  <label class="form-label small mb-0" for="icmalKisi">Personel</label>
+                  <select id="icmalKisi" class="form-select form-select-sm" style="min-width:16rem"></select>
+                </div>
+                <div class="col-auto">
                   <label class="form-label small mb-0" for="icmalBas">Başlangıç ayı</label>
                   <input type="month" id="icmalBas" class="form-control form-control-sm">
                 </div>
@@ -198,8 +202,9 @@
                 </div>
               </div></div>
               <div class="card card-secondary card-outline mt-3"><div class="card-header"><h3 class="card-title">Kişiler (OCR eşleştirmesi ve öneriler)</h3></div><div class="card-body">
-                <label class="form-label small">Her satıra: Ad SOYAD; Ünvan</label>
+                <label class="form-label small">Her satıra: Ad SOYAD; Görevi; Cetvel ünvanı; Seyyar ünvanı</label>
                 <textarea class="form-control form-control-sm font-monospace" id="kisilerAlan" rows="8"></textarea>
+                <div class="form-text">Görevi, icmallerdeki personel seçiminde "Ad SOYAD - Görevi" olarak görünür ve imzada kullanılır (ör. Mühendis, Şoför). Cetvel ve seyyar ünvanı boşsa görevi yazılır.</div>
               </div></div>
             </div>
             <div class="col-lg-6">

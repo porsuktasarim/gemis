@@ -5,7 +5,8 @@
 // Görüntü hiçbir aşamada diske yazılmaz: sharp bellekte işler, Tesseract'a stdin üzerinden verilir.
 const { spawn } = require('child_process');
 const sharp = require('sharp');
-const { ILCELER, sade, benzer, yerAyristir, tarihISO, saatNormal, trTitle } = require('./util');
+const { ILCELER, sade, benzer, levenshtein, yerAyristir, tarihISO, saatNormal, trTitle } = require('./util');
+const { bolgeselOku } = require('./zon');
 
 function tesseract(png, psm) {
   return new Promise((resolve) => {
@@ -143,25 +144,90 @@ function saatleriBul(metin) {
   return { cikis: s[0] || '', donus: s[1] || '' };
 }
 
-// baglam: { kisiler:[{ad}], amirler:[ad], bilinenMahalleler:{ilce:[mahalle]}, sayiOnek }
-async function gorevOku(dosyaYolu, orijinalAd, baglam) {
-  const { kisiler = [], amirler = [], bilinenMahalleler = {}, sayiOnek = '' } = baglam || {};
-  const metin = await metinOku(dosyaYolu);
+// Kişi adı eşleştirme (el yazısı için daha toleranslı)
+function kisiEslestir(ham, kisiler, oran = 0.3) {
+  const h = sade(ham);
+  if (h.length < 4) return '';
+  let en = null, enMesafe = Infinity;
+  for (const k of kisiler) {
+    const a = sade(k.ad);
+    const m = levenshtein(h, a) / Math.max(h.length, a.length);
+    if (m < enMesafe) { enMesafe = m; en = k.ad; }
+    // yalnızca soyadı okunduysa
+    const soyad = sade(k.ad.split(/\s+/).pop());
+    if (soyad.length >= 4 && h.includes(soyad) && 0.1 < enMesafe) { enMesafe = 0.1; en = k.ad; }
+  }
+  return enMesafe <= oran ? en : '';
+}
+
+function plakaCoz(ham, bilinen = []) {
+  const t = (ham || '').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  const m = /(\d{2})\s*([A-Z]{1,3})\s*(\d{2,4})/.exec(t);
+  const aday = m ? `${m[1]} ${m[2]} ${m[3]}` : '';
+  // Daha önce girilen plakalarla karşılaştır (el yazısı hatalarını düzeltir)
+  const sik = sade(aday || t);
+  if (sik.length >= 5) {
+    let en = '', enM = Infinity;
+    for (const p of bilinen) { const d = levenshtein(sik, sade(p)); if (d < enM) { enM = d; en = p; } }
+    if (en && enM <= 2) return en;
+  }
+  return aday;
+}
+
+function belgeNoCoz(ham) {
+  const adaylar = (ham || '').replace(/[.,:]/g, ' ').match(/\d{5,6}/g) || [];
+  const sayac = {};
+  for (const a of adaylar) { const n = a.length === 5 ? `0${a}` : a; sayac[n] = (sayac[n] || 0) + 1; }
+  const en = Object.entries(sayac).sort((x, y) => y[1] - x[1])[0];
+  return en ? en[0] : '';
+}
+
+// "Çatalca Çiftlikköy" gibi ayraçsız yazımlarda ilçeden sonra ayraç ekle
+function yerOnIsle(t) {
+  let s = (t || '').replace(/[|_“”"]/g, ' ');
+  for (const i of ILCELER) s = s.replace(new RegExp(`(${i})\\s+(?=[^\\s,/\\-])`, 'giu'), '$1-');
+  return s.replace(/B\.\s*Çekmece/giu, 'Büyükçekmece').replace(/K\.\s*Çekmece/giu, 'Küçükçekmece');
+}
+
+// Ad soyad biçimi: soyad büyük harf, ad baş harfi büyük
+function adBicimle(ad) {
+  const p = ad.split(/\s+/);
+  return p.map((w, i) => i === p.length - 1 ? w.toLocaleUpperCase('tr-TR') : trTitle(w)).join(' ');
+}
+
+// baglam: { kisiler:[{ad}], amirler:[ad], bilinenMahalleler:{ilce:[mahalle]}, sayiOnek, bilinenPlakalar:[...] }
+async function gorevOku(girdi, orijinalAd, baglam) {
+  const { kisiler = [], amirler = [], bilinenMahalleler = {}, sayiOnek = '', bilinenPlakalar = [] } = baglam || {};
+  const z = await bolgeselOku(girdi);
+  const metin = z.metin;
   const haric = new Set([...kisiler.map(k => k.ad), ...amirler].flatMap(a => a.split(/\s+/).map(sade)).filter(k => k.length >= 3));
-  const yer = yerBul(metin, haric, bilinenMahalleler);
+
+  // Gideceği yer: önce kendi hücresi, olmazsa tam metin
+  let yer = z.yer ? yerBul(`Gideceği Yer: ${yerOnIsle(z.yer)}`, new Set(), bilinenMahalleler) : [];
+  if (!yer.length) yer = yerBul(metin, haric, bilinenMahalleler);
+
+  // Personel: hücrelerden okunan adlar (bilinen kişiyle eşleşirse o ad), artı tam metinde bulunan bilinen kişiler
+  const personel = [];
+  for (const ham of z.personel || []) {
+    const ad = kisiEslestir(ham, kisiler, 0.25) || adBicimle(ham);
+    if (!personel.includes(ad)) personel.push(ad);
+  }
+  for (const ad of kisileriBul(metin, kisiler)) if (!personel.includes(ad)) personel.push(ad);
+
   const saat = saatleriBul(metin);
   return {
     ocrMetin: metin,
-    tarih: dosyaAdiTarihi(orijinalAd) || gorevTarihiBul(metin),
-    sayi: sayiBul(metin, sayiOnek),
-    personel: kisileriBul(metin, kisiler),
+    tarih: dosyaAdiTarihi(orijinalAd) || gorevTarihiBul(`Görev Tarihi ${(z.tarih || '').split(/d[üu]zenleme/i)[0]}`) || gorevTarihiBul(metin),
+    sayi: sayiBul(`Sayı ${z.sayi || ''}`, sayiOnek) || sayiBul(metin, sayiOnek),
+    personel,
     yer,
     yerHam: yer.map(g => [g.ilce, ...g.mahalleler].join('-')).join(', '),
-    plaka: plakaBul(metin),
-    belgeNo: belgeNoBul(metin),
-    cikis: saat.cikis,
-    donus: saat.donus
+    surucu: kisiEslestir(z.surucu, kisiler, 0.35),
+    plaka: plakaCoz(z.plaka, bilinenPlakalar) || plakaBul(metin),
+    belgeNo: belgeNoCoz(z.belgeNo),
+    cikis: z.cikis || saat.cikis,
+    donus: z.donus || saat.donus
   };
 }
 
-module.exports = { gorevOku, metinOku, ILCELER };
+module.exports = { gorevOku, metinOku, kisiEslestir, plakaCoz, belgeNoCoz, yerOnIsle, ILCELER };
