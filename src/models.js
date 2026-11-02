@@ -14,7 +14,9 @@ const GorevSchema = new mongoose.Schema({
   personel: [String],
   cikis: String,                                // HH:MM
   donus: String,
-  dosya: String,                                // yüklenen görüntü dosya adı
+  dosya: String,                                // elle yüklenen görüntünün dosya adı (yerel)
+  driveId: { type: String, index: true },       // Drive'dan alınan görüntünün dosya kimliği (görüntü sunucuda tutulmaz)
+  driveAd: String,                              // Drive'daki dosya adı / alt klasör yolu
   ocrMetin: String,
   onayli: { type: Boolean, default: false }
 }, { timestamps: true });
@@ -40,6 +42,9 @@ const AyarSchema = new mongoose.Schema({
   ilMudYrdUnvan: { type: String, default: 'İl Müdür Yardımcısı' },
   sayiOnek: { type: String, default: '' },                         // örn. E-12345678-123.45.67- (OCR sayı tamamlama)
   ocrHaricAdlar: { type: [String], default: [] },                 // gideceği yer aranırken atlanacak adlar (amirler vb.)
+  driveKlasor: { type: String, default: '' },                      // Drive klasör bağlantısı ya da kimliği
+  gorselSakla: { type: Boolean, default: false },                  // görüntülerin kopyası sunucuda tutulsun mu
+  driveOtoTaraDk: { type: Number, default: 0 },                    // otomatik tarama aralığı (dakika, 0 = kapalı)
   mesaiBas: { type: String, default: '08:30' },
   mesaiBit: { type: String, default: '17:00' },
   puantajKontrolTuru: { type: String, default: 'Mera Kanunu Uyg.' },

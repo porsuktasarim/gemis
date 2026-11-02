@@ -11,6 +11,8 @@ services:
     environment:
       MONGO_URL: mongodb://mongo:27017/gemis
       TZ: Europe/Istanbul
+      # Google Drive hizmet hesabı anahtarı (JSON içeriği, tek satır). Boşsa Drive özelliği kapalı kalır.
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${GOOGLE_SERVICE_ACCOUNT_JSON:-}
     ports:
       - "1138:1138"
     volumes:

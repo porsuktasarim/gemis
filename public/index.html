@@ -29,7 +29,10 @@
         <input type="month" id="gorevAy" class="form-control form-control-sm">
       </div>
       <div class="col-auto">
-        <label class="btn btn-primary btn-sm mb-0">
+        <button class="btn btn-primary btn-sm" id="driveTara" hidden><i class="bi bi-google"></i> Drive'dan içe aktar</button>
+      </div>
+      <div class="col-auto">
+        <label class="btn btn-outline-primary btn-sm mb-0">
           <i class="bi bi-upload"></i> Görev emri yükle (JPEG)
           <input type="file" id="dosyaSec" accept="image/jpeg,image/png" multiple hidden>
         </label>
@@ -114,7 +117,29 @@
         </div></div>
       </div>
       <div class="col-lg-6">
-        <div class="card"><div class="card-header">EDYS sayı alanı</div><div class="card-body row g-2">
+        <div class="card"><div class="card-header">Google Drive ve görüntüler</div><div class="card-body row g-2">
+          <div class="col-12 small" id="driveHesap"></div>
+          <div class="col-12">
+            <label class="form-label small">Görev emirleri klasörü (bağlantı ya da klasör kimliği)</label>
+            <div class="input-group input-group-sm">
+              <input class="form-control" name="driveKlasor" placeholder="https://drive.google.com/drive/folders/…">
+              <button class="btn btn-outline-secondary" type="button" id="driveTest">Bağlantıyı dene</button>
+            </div>
+            <div class="form-text" id="driveTestSonuc">Alt klasörler de taranır (3 seviyeye kadar).</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">Otomatik tarama (dakika, 0 = kapalı)</label>
+            <input type="number" min="0" step="5" class="form-control form-control-sm" name="driveOtoTaraDk">
+          </div>
+          <div class="col-md-6 d-flex align-items-end">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" role="switch" name="gorselSakla" id="gorselSakla">
+              <label class="form-check-label small" for="gorselSakla">Görüntüleri sunucuda sakla</label>
+            </div>
+          </div>
+          <div class="col-12 form-text">Kapalıyken görüntüler sunucuya kaydedilmez: Drive'dan gelenler OCR ve görüntüleme/PDF için her seferinde Drive'dan anlık alınır; elle yüklenenler yalnızca OCR'dan geçer, saklanmaz.</div>
+        </div></div>
+        <div class="card mt-3"><div class="card-header">EDYS sayı alanı</div><div class="card-body row g-2">
           <div class="col-12"><label class="form-label small">Görev emri sayı öneki (OCR tamamlaması için, örn. E-12345678-123.45.67-)</label><input class="form-control form-control-sm" name="sayiOnek"></div>
           <div class="col-12 small text-muted">Her şablonun EDYS'deki sayı parçasını (td'li ya da p'li hali) buraya yapıştırınız; olduğu gibi başlığa konur. Boş bırakılırsa sayı satırı çıkmaz.</div>
           <div class="col-12"><label class="form-label small">Ek özel hizmet</label><textarea class="form-control form-control-sm font-monospace" name="sayiEkOzel" rows="2"></textarea></div>

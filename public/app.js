@@ -47,7 +47,7 @@ async function gorevleriYukle() {
       <td>${esc(g.belgeNo) || bos}</td>
       <td class="small">${esc((g.personel || []).join(', '))}</td>
       <td>${g.onayli ? '<span class="badge text-bg-success">Kontrol edildi</span>' : '<span class="badge text-bg-warning">Kontrol bekliyor</span>'}
-          ${g.dosya ? '<i class="bi bi-image text-muted" title="Görüntü var"></i>' : '<i class="bi bi-image text-danger" title="Görüntü yok"></i>'}</td>
+          ${g.driveId ? '<i class="bi bi-google text-muted" title="Görüntü Drive\'da"></i>' : g.dosya ? '<i class="bi bi-image text-muted" title="Görüntü sunucuda"></i>' : '<i class="bi bi-image text-danger" title="Görüntü yok"></i>'}</td>
       <td><button class="btn btn-sm btn-link p-0"><i class="bi bi-pencil"></i></button></td>
     </tr>`).join('') : '<tr><td colspan="10" class="text-muted text-center py-4">Bu ay için görev emri yok. JPEG yükleyebilir ya da elle ekleyebilirsiniz.</td></tr>';
 }
@@ -98,7 +98,7 @@ function formDoldur(g) {
 async function gorevAc(id) {
   aktifGorev = id ? await api(`/api/gorevler/${id}`) : { personel: [] };
   formDoldur(aktifGorev);
-  const var_ = !!aktifGorev.dosya;
+  const var_ = !!(aktifGorev.dosya || aktifGorev.driveId);
   $('#gorselKutu').hidden = !var_;
   if (var_) { const u = `/api/gorevler/${id}/gorsel?t=${Date.now()}`; $('#gorsel').src = u; $('#gorselAc').href = u; }
   $('#gorevSil').hidden = !id;
@@ -235,17 +235,20 @@ async function ayarlariYukle() {
   const [a, kisiler] = await Promise.all([api('/api/ayarlar'), api('/api/kisiler')]);
   for (const el of af.elements) {
     if (!el.name || el.name === 'tatiller' || el.name === 'mahalliDisi') continue;
+    if (el.type === 'checkbox') { el.checked = !!a[el.name]; continue; }
     el.value = Array.isArray(a[el.name]) ? a[el.name].join(', ') : (a[el.name] ?? '');
   }
   af.tatiller.value = (a.tatiller || []).sort((x, y) => x.tarih.localeCompare(y.tarih))
     .map(t => [tarihTR(t.tarih), t.ad, t.yarim ? 'yarım' : ''].filter(Boolean).join('; ')).join('\n');
   af.mahalliDisi.value = (a.mahalliDisi || []).map(m => `${m.ilce}: ${m.mahalleler.join(', ')}`).join('\n');
   $('#kisilerAlan').value = kisiler.map(k => [k.ad, k.unvan].filter(Boolean).join('; ')).join('\n');
+  driveDurumYukle();
 }
 af.addEventListener('submit', async (e) => {
   e.preventDefault();
   const veri = {};
-  for (const el of af.elements) if (el.name && el.name !== 'tatiller' && el.name !== 'mahalliDisi') veri[el.name] = el.value;
+  for (const el of af.elements) if (el.name && el.name !== 'tatiller' && el.name !== 'mahalliDisi') veri[el.name] = el.type === 'checkbox' ? el.checked : el.value;
+  veri.driveOtoTaraDk = Number(veri.driveOtoTaraDk) || 0;
   veri.ocrHaricAdlar = af.ocrHaricAdlar.value.split(',').map(s => s.trim()).filter(Boolean);
   veri.tatiller = af.tatiller.value.split('\n').map(s => s.split(';').map(x => x.trim())).filter(p => tarihISO(p[0]))
     .map(p => ({ tarih: tarihISO(p[0]), ad: p[1] || '', yarim: /yar[ıi]m/i.test(p[2] || '') }));
@@ -263,4 +266,37 @@ $('#ornekVeri').addEventListener('click', async () => {
   $('#gorevAy').value = '2026-10'; gorevleriYukle(); onerileriYukle();
 });
 
-gorevleriYukle(); onerileriYukle();
+// ---------- Google Drive ----------
+async function driveDurumYukle() {
+  const d = await api('/api/drive/durum');
+  $('#driveTara').hidden = !(d.tanimli && d.klasor);
+  $('#driveHesap').innerHTML = d.tanimli
+    ? `Hizmet hesabı: <code>${esc(d.eposta)}</code><br><span class="text-muted">Drive klasörünü bu adrese "Görüntüleyen" olarak paylaşınız.</span>`
+    : '<span class="text-danger">Google hizmet hesabı tanımlı değil.</span> <span class="text-muted">Sunucuda GOOGLE_SERVICE_ACCOUNT_JSON ortam değişkeni verilmelidir (README).</span>';
+  return d;
+}
+
+$('#driveTest').addEventListener('click', async () => {
+  $('#driveTestSonuc').textContent = 'Deneniyor…';
+  try {
+    const r = await api('/api/drive/test', { method: 'POST', body: JSON.stringify({ klasor: af.driveKlasor.value }) });
+    $('#driveTestSonuc').innerHTML = `<span class="text-success">Bağlantı tamam:</span> "${esc(r.ad)}" klasöründe ${r.gorselSayisi} görüntü var.`;
+  } catch (e) { $('#driveTestSonuc').innerHTML = `<span class="text-danger">${esc(e.message)}</span>`; }
+});
+
+$('#driveTara').addEventListener('click', async () => {
+  const btn = $('#driveTara'); btn.disabled = true;
+  $('#yukleDurum').innerHTML = '<span class="spinner-border spinner-border-sm"></span> Drive taranıyor, yeni görüntüler OCR\'dan geçiriliyor…';
+  try {
+    const o = await api('/api/drive/tara', { method: 'POST' });
+    const satir = [`Drive: ${o.bulunan} görüntü bulundu, ${o.yeni} yeni kayıt, ${o.baglanan} mevcut kayda bağlandı.`];
+    o.kayitlar.forEach(k => satir.push(`${esc(k.dosya)}: ${esc(k.durum)}${k.tarih ? ` (${tarihTR(k.tarih)})` : ''}`));
+    o.hata.forEach(h => satir.push(`<span class="text-danger">${esc(h)}</span>`));
+    $('#yukleDurum').innerHTML = satir.join('<br>');
+    const ilk = o.kayitlar.find(k => k.tarih); if (ilk) $('#gorevAy').value = ilk.tarih.slice(0, 7);
+    await gorevleriYukle(); onerileriYukle();
+  } catch (e) { $('#yukleDurum').innerHTML = `<span class="text-danger">${esc(e.message)}</span>`; }
+  btn.disabled = false;
+});
+
+gorevleriYukle(); onerileriYukle(); driveDurumYukle();

@@ -18,6 +18,15 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
     gelir.
   - Dosya adında tarih varsa (`2026_10_13.jpg`, `13.10.2026.jpg`) görev tarihi
     oradan alınır.
+- **Google Drive'dan içe aktarma**
+  - Drive'daki görev emirleri klasörü ve alt klasörleri taranır. Yeni JPEG/PNG'ler OCR'dan geçirilip kayıt olarak eklenir.
+  - Tarama düğmeyle ya da belirli aralıklarla otomatik yapılır.
+  - Daha önce işlenen dosyalar Drive dosya kimliğinden tanınır, tekrar eklenmez.
+- **Görüntü saklama seçeneği**
+  - Varsayılan olarak görüntüler sunucuya kaydedilmez. OCR bellekte yapılır, Tesseract'a stdin üzerinden verilir.
+  - Drive'dan gelen görüntüler, görüntüleme ve PDF için her seferinde Drive'dan anlık alınır.
+  - Elle yüklenen görüntüler yalnızca OCR'dan geçer.
+  - İstenirse Ayarlar'dan "Görüntüleri sunucuda sakla" açılarak kopya tutulabilir.
 - **Gideceği yer ayrıştırma**
   - "Büyükçekmece-Tepecik, Bağcılar" gibi metinler İstanbul ilçe listesine göre
     ilçe/mahalle olarak ayrıştırılır.
@@ -65,6 +74,21 @@ Tarayıcıdan `http://localhost:1138` adresi açılır.
 
 `docker compose down` birimleri silmez; `down -v` kullanılırsa bütün veriler
 silinir.
+
+### Google Drive bağlantısı (isteğe bağlı)
+
+Uygulama Drive'a bir **hizmet hesabı** ile, yalnızca okuma izniyle erişir. Klasör herkese açılmaz; yalnızca hizmet hesabına paylaşılır.
+
+1. https://console.cloud.google.com adresinde yeni bir proje oluşturulur (ör. `gemis`).
+2. **APIs & Services → Library** bölümünde **Google Drive API** aranır ve **Enable** ile etkinleştirilir.
+3. **APIs & Services → Credentials → Create credentials → Service account** seçilir. Ad olarak `gemis` yazılır; rol verilmesine gerek yoktur.
+4. Oluşan hizmet hesabı açılır. **Keys → Add key → Create new key → JSON** ile anahtar dosyası indirilir. Bu dosya gizli tutulmalı, depoya eklenmemelidir.
+5. Drive'da görev emirleri klasörüne sağ tıklanıp **Paylaş** seçilir. Hizmet hesabının e-postası (`gemis@PROJE.iam.gserviceaccount.com`) **Görüntüleyen** olarak eklenir.
+6. Anahtar uygulamaya ortam değişkeni olarak verilir:
+   - **Coolify:** Uygulamanın **Environment Variables** bölümünde `GOOGLE_SERVICE_ACCOUNT_JSON` değişkenine JSON dosyasının bütün içeriği yapıştırılır. Değişken gizli (secret) işaretlenir ve yeniden deploy edilir.
+   - **Yerel Docker:** Proje klasöründe `.env` dosyası oluşturulup içine `GOOGLE_SERVICE_ACCOUNT_JSON='{...tek satır JSON...}'` yazılır.
+7. Uygulamada **Ayarlar → Google Drive ve görüntüler** bölümünde klasör bağlantısı girilir ve **Bağlantıyı dene** ile kontrol edilir. Aynı bölümden otomatik tarama aralığı da ayarlanabilir.
+8. **Görev Emirleri** sekmesinde **Drive'dan içe aktar** düğmesi görünür.
 
 ### Eski işlemciler
 

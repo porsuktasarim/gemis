@@ -2,8 +2,6 @@
 const ExcelJS = require('exceljs');
 const { PDFDocument } = require('pdf-lib');
 const sharp = require('sharp');
-const fs = require('fs/promises');
-const path = require('path');
 
 const ince = { style: 'thin', color: { argb: 'FF808080' } };
 const kenar = { top: ince, left: ince, bottom: ince, right: ince };
@@ -71,15 +69,16 @@ async function excelUret(ayar, x) {
   return wb.xlsx.writeBuffer();
 }
 
-// Görev emri görüntülerini A4 sayfalara yerleştirip tek PDF yap
-async function pdfUret(gorevler, klasor) {
+// Görev emri görüntülerini A4 sayfalara yerleştirip tek PDF yap.
+// gorselGetir(g) => Buffer|null : yerel kopyadan ya da Drive'dan bellekte getirir.
+async function pdfUret(gorevler, gorselGetir) {
   const pdf = await PDFDocument.create();
   const A4 = [841.89, 595.28]; // yatay
   let eklenen = 0;
   for (const g of gorevler) {
-    if (!g.dosya) continue;
     let veri;
-    try { veri = await fs.readFile(path.join(klasor, g.dosya)); } catch { continue; }
+    try { veri = await gorselGetir(g); } catch (e) { console.error(`PDF: ${g.tarih} görüntüsü alınamadı: ${e.message}`); continue; }
+    if (!veri) continue;
     const jpg = await sharp(veri).rotate().jpeg({ quality: 85 }).toBuffer();
     const img = await pdf.embedJpg(jpg);
     const dikey = img.height > img.width;

@@ -2,36 +2,36 @@
 // Basılı alanlar (sayı, görev tarihi, personel, gideceği yer) çoğunlukla okunur;
 // el yazısı alanlar (sürücü, plaka, saatler, belge no) yalnızca denenir, kullanıcı formda tamamlar.
 
-const { execFile } = require('child_process');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+// Görüntü hiçbir aşamada diske yazılmaz: sharp bellekte işler, Tesseract'a stdin üzerinden verilir.
+const { spawn } = require('child_process');
 const sharp = require('sharp');
 const { ILCELER, sade, benzer, yerAyristir, tarihISO, saatNormal, trTitle } = require('./util');
 
-function tesseract(dosya, psm) {
+function tesseract(png, psm) {
   return new Promise((resolve) => {
-    execFile('tesseract', [dosya, 'stdout', '-l', 'tur', '--psm', String(psm)],
-      { maxBuffer: 10 * 1024 * 1024, timeout: 120000 },
-      (err, stdout) => resolve(err ? '' : stdout));
+    const p = spawn('tesseract', ['stdin', 'stdout', '-l', 'tur', '--psm', String(psm)]);
+    const parca = [];
+    const zaman = setTimeout(() => p.kill('SIGKILL'), 120000);
+    p.stdout.on('data', d => parca.push(d));
+    p.on('error', () => { clearTimeout(zaman); resolve(''); });
+    p.on('close', () => { clearTimeout(zaman); resolve(Buffer.concat(parca).toString('utf8')); });
+    p.stdin.on('error', () => {});
+    p.stdin.end(png);
   });
 }
 
+// girdi: dosya yolu ya da Buffer
 async function onIsle(girdi) {
   const meta = await sharp(girdi).metadata();
-  const gecici = path.join(os.tmpdir(), `ocr-${Date.now()}-${Math.random().toString(36).slice(2)}.png`);
-  await sharp(girdi).rotate().grayscale()
+  return sharp(girdi).rotate().grayscale()
     .resize({ width: Math.min((meta.width || 1750) * 2, 4000) })
-    .normalise().threshold(170).png().toFile(gecici);
-  return gecici;
+    .normalise().threshold(170).png().toBuffer();
 }
 
 async function metinOku(girdi) {
-  const gecici = await onIsle(girdi);
-  try {
-    const [blok, seyrek] = await Promise.all([tesseract(gecici, 4), tesseract(gecici, 11)]);
-    return `${blok}\n-----\n${seyrek}`;
-  } finally { fs.unlink(gecici, () => {}); }
+  const png = await onIsle(girdi);
+  const [blok, seyrek] = await Promise.all([tesseract(png, 4), tesseract(png, 11)]);
+  return `${blok}\n-----\n${seyrek}`;
 }
 
 const satirlar = (t) => t.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
