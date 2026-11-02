@@ -1,25 +1,41 @@
-# Coolify için: host portu bağlanmaz, trafik Coolify proxy'si (Traefik) üzerinden gelir.
-# Coolify'da "Docker Compose Location" alanına /docker-compose.coolify.yml yazılmalı ve
-# app servisinin domain alanı https://gemis.pors.uk:3000 olarak girilmelidir
-# (:3000 konteynerin iç portudur, adrese eklenmez).
+# Coolify için compose dosyası.
+# - Host portu bağlanmaz; trafik Coolify proxy'si (Traefik) üzerinden gelir.
+# - Coolify'da "Docker Compose Location": /docker-compose.coolify.yml
+# - app servisinin domain alanı: https://ALAN-ADI:1138  (:1138 konteynerin iç portudur, adrese eklenmez)
+# - mongo servisine domain verilmez.
+# 1138 = "Görev Emri İcmal Sistemi" ebced değeri.
 services:
   mongo:
     image: mongo:7
     restart: unless-stopped
     volumes:
       - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
   app:
     build: .
     restart: unless-stopped
-    depends_on: [mongo]
+    depends_on:
+      mongo:
+        condition: service_healthy
     environment:
       MONGO_URL: mongodb://mongo:27017/gemis
       TZ: Europe/Istanbul
-      PORT: 3000
+      PORT: 1138
     expose:
-      - "3000"
+      - "1138"
     volumes:
       - uploads:/data/uploads
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:1138/api/turler',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
 volumes:
   mongo-data:
   uploads:

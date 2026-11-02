@@ -54,7 +54,7 @@ cd gemis
 docker compose up -d --build
 ```
 
-Tarayıcıdan `http://localhost:3000` adresi açılır.
+Tarayıcıdan `http://localhost:1138` adresi açılır.
 
 | İşlem | Komut |
 |---|---|
@@ -74,16 +74,31 @@ MongoDB 5 ve üstü AVX destekli işlemci ister. `docker compose logs mongo`
 
 ### Ağdaki başka bilgisayardan erişim
 
-`http://SUNUCU-IP:3000` ile açılabilir. Tarayıcılar http adreslerinde pano
+`http://SUNUCU-IP:1138` ile açılabilir. Tarayıcılar http adreslerinde pano
 erişimini kısıtladığı için kopyalama eski yönteme geçer. Gerekirse .xlsx/.html
 indirme seçenekleri kullanılmalıdır.
 
 ### Coolify ile yayınlama
 
-1. Coolify'da kaynak olarak bu depo seçilmeli, build pack olarak **Docker Compose** kullanılmalıdır.
-2. **Docker Compose Location** alanına `/docker-compose.coolify.yml` yazılmalıdır. Bu dosya host portu bağlamaz; böylece sunucudaki diğer uygulamalarla port çakışması olmaz.
-3. `app` servisinin domain alanı `https://ALAN-ADI:3000` biçiminde girilmelidir. Buradaki `:3000` konteynerin iç portudur, adrese eklenmez. `mongo` servisine domain verilmemelidir.
-4. Cloudflare kullanılıyorsa SSL/TLS modu **Full** olmalıdır. İki seviyeli alt alan adları (ör. `www.gemis.alan.uk`) Cloudflare'in ücretsiz sertifikası kapsamında değildir.
+Uygulama 1138 portunda çalışır ("Görev Emri İcmal Sistemi" ebced değeri).
+
+1. Coolify'da **Projects → + Add** ile bir proje oluşturulur, `production` ortamı açılır.
+2. **+ New → Public Repository** seçilir. Depo gizliyse **Private Repository (with GitHub App)** seçilir; bunun için önce Coolify'ın **Sources** bölümünde GitHub App kurulmuş olmalıdır.
+3. Kaynak bilgileri girilir:
+   - Repository URL: `https://github.com/porsuktasarim/gemis`
+   - Branch: `main`
+   - Build Pack: **Docker Compose**
+   - Base Directory: `/`
+   - Docker Compose Location: `/docker-compose.coolify.yml`
+
+   Bu compose dosyası host portu bağlamaz; böylece sunucudaki diğer uygulamalarla port çakışması olmaz.
+4. Servis listesinde `app` için domain alanına `https://ALAN-ADI:1138` girilir. Buradaki `:1138` konteynerin iç portudur, adrese eklenmez. `mongo` servisine domain verilmez.
+5. **Save** ve ardından **Deploy** yapılır. `app` logunun sonunda `GEMİS http://localhost:1138` görülmeli, servis durumu `Running (healthy)` olmalıdır.
+6. Cloudflare kullanılıyorsa iki ayar gerekir:
+   - DNS'te alan adı için A kaydı sunucu IP'sine yönlendirilir (turuncu bulut).
+   - SSL/TLS modu **Full** olmalıdır.
+
+   İki seviyeli alt alan adları (ör. `www.gemis.alan.uk`) Cloudflare'in ücretsiz sertifikası kapsamında değildir.
 
 ### Docker olmadan (geliştirme)
 

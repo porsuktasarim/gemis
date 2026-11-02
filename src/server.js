@@ -12,7 +12,7 @@ const { excelUret, pdfUret } = require('./disaktar');
 const { yerAyristir, saatNormal, sade } = require('./util');
 const varsayilan = require('../seed/varsayilan');
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 1138;
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017/gemis';
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'data', 'uploads');
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
