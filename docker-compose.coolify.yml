@@ -1,0 +1,25 @@
+# Coolify için: host portu bağlanmaz, trafik Coolify proxy'si (Traefik) üzerinden gelir.
+# Coolify'da "Docker Compose Location" alanına /docker-compose.coolify.yml yazılmalı ve
+# app servisinin domain alanı https://gemis.pors.uk:3000 olarak girilmelidir
+# (:3000 konteynerin iç portudur, adrese eklenmez).
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on: [mongo]
+    environment:
+      MONGO_URL: mongodb://mongo:27017/gemis
+      TZ: Europe/Istanbul
+      PORT: 3000
+    expose:
+      - "3000"
+    volumes:
+      - uploads:/data/uploads
+volumes:
+  mongo-data:
+  uploads:

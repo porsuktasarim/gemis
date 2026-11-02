@@ -78,6 +78,13 @@ MongoDB 5 ve üstü AVX destekli işlemci ister. `docker compose logs mongo`
 erişimini kısıtladığı için kopyalama eski yönteme geçer. Gerekirse .xlsx/.html
 indirme seçenekleri kullanılmalıdır.
 
+### Coolify ile yayınlama
+
+1. Coolify'da kaynak olarak bu depo seçilmeli, build pack olarak **Docker Compose** kullanılmalıdır.
+2. **Docker Compose Location** alanına `/docker-compose.coolify.yml` yazılmalıdır. Bu dosya host portu bağlamaz; böylece sunucudaki diğer uygulamalarla port çakışması olmaz.
+3. `app` servisinin domain alanı `https://ALAN-ADI:3000` biçiminde girilmelidir. Buradaki `:3000` konteynerin iç portudur, adrese eklenmez. `mongo` servisine domain verilmemelidir.
+4. Cloudflare kullanılıyorsa SSL/TLS modu **Full** olmalıdır. İki seviyeli alt alan adları (ör. `www.gemis.alan.uk`) Cloudflare'in ücretsiz sertifikası kapsamında değildir.
+
 ### Docker olmadan (geliştirme)
 
 Node.js 20+, MongoDB ve `tesseract-ocr` + `tesseract-ocr-tur` paketleri
