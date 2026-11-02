@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GEMİS – Görev Emri İcmal Sistemi</title>
+<link rel="stylesheet" href="/vendor/bootstrap/css/bootstrap.min.css">
+<link rel="stylesheet" href="/vendor/icons/bootstrap-icons.min.css">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<nav class="navbar navbar-expand bg-body-tertiary border-bottom mb-3">
+  <div class="container-fluid">
+    <span class="navbar-brand"><i class="bi bi-clipboard-check"></i> GEMİS</span>
+    <ul class="nav nav-pills">
+      <li class="nav-item"><button class="nav-link active" data-sekme="gorevler">Görev Emirleri</button></li>
+      <li class="nav-item"><button class="nav-link" data-sekme="icmaller">İcmaller</button></li>
+      <li class="nav-item"><button class="nav-link" data-sekme="ayarlar">Ayarlar</button></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="container-fluid pb-5">
+  <!-- GÖREV EMİRLERİ -->
+  <section id="sekme-gorevler">
+    <div class="row g-2 align-items-end mb-3">
+      <div class="col-auto">
+        <label class="form-label small mb-0">Ay</label>
+        <input type="month" id="gorevAy" class="form-control form-control-sm">
+      </div>
+      <div class="col-auto">
+        <label class="btn btn-primary btn-sm mb-0">
+          <i class="bi bi-upload"></i> Görev emri yükle (JPEG)
+          <input type="file" id="dosyaSec" accept="image/jpeg,image/png" multiple hidden>
+        </label>
+      </div>
+      <div class="col-auto"><button class="btn btn-outline-secondary btn-sm" id="yeniGorev"><i class="bi bi-plus-lg"></i> Elle ekle</button></div>
+      <div class="col"><div id="yukleDurum" class="small text-muted"></div></div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle">
+        <thead class="table-light"><tr>
+          <th>Tarih</th><th>Gideceği yer</th><th>Sürücü</th><th>Plaka</th><th>Çıkış</th><th>Dönüş</th><th>Belge No</th><th>Personel</th><th>Durum</th><th></th>
+        </tr></thead>
+        <tbody id="gorevTablo"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- İCMALLER -->
+  <section id="sekme-icmaller" hidden>
+    <div class="row g-2 align-items-end mb-2">
+      <div class="col-auto">
+        <label class="form-label small mb-0">İcmal</label>
+        <select id="icmalTur" class="form-select form-select-sm"></select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small mb-0">Başlangıç ayı</label>
+        <input type="month" id="icmalBas" class="form-control form-control-sm">
+      </div>
+      <div class="col-auto" id="bitKutu">
+        <label class="form-label small mb-0">Bitiş ayı</label>
+        <input type="month" id="icmalBit" class="form-control form-control-sm">
+      </div>
+      <div class="col-auto" id="haricKutu">
+        <label class="form-label small mb-0">Hariç günler (izin, rapor…)</label>
+        <input type="text" id="icmalHaric" class="form-control form-control-sm" placeholder="05.10.2026, 12.10.2026" style="min-width:16rem">
+      </div>
+      <div class="col-auto" id="donemKutu" hidden>
+        <label class="form-label small mb-0">Dönem metni (boşsa aylar yazılır)</label>
+        <input type="text" id="icmalDonem" class="form-control form-control-sm" placeholder="2026/2- Ekim" style="min-width:14rem">
+      </div>
+      <div class="col-auto"><button class="btn btn-primary btn-sm" id="icmalOlustur"><i class="bi bi-gear"></i> Oluştur</button></div>
+    </div>
+    <div id="icmalIslem" class="d-flex flex-wrap gap-2 my-2" hidden>
+      <button class="btn btn-outline-primary btn-sm" id="kopyalaHtml"><i class="bi bi-code-slash"></i> HTML'i kopyala</button>
+      <button class="btn btn-outline-success btn-sm" id="kopyalaTablo"><i class="bi bi-table"></i> Excel'e yapıştırmak için kopyala</button>
+      <a class="btn btn-success btn-sm" id="indirXlsx"><i class="bi bi-file-earmark-excel"></i> Excel (.xlsx) indir</a>
+      <a class="btn btn-outline-secondary btn-sm" id="indirHtml"><i class="bi bi-filetype-html"></i> HTML dosyası indir</a>
+      <a class="btn btn-danger btn-sm" id="indirPdf"><i class="bi bi-file-earmark-pdf"></i> Görev emirleri PDF</a>
+      <span class="small text-muted align-self-center" id="icmalBilgi"></span>
+    </div>
+    <div id="icmalUyari"></div>
+    <iframe id="onizleme" class="w-100 border rounded bg-white" style="height:75vh" title="Önizleme"></iframe>
+  </section>
+
+  <!-- AYARLAR -->
+  <section id="sekme-ayarlar" hidden>
+    <form id="ayarForm" class="row g-3">
+      <div class="col-lg-6">
+        <div class="card"><div class="card-header">Personel ve imzacılar</div><div class="card-body row g-2">
+          <div class="col-md-6"><label class="form-label small">Personel adı soyadı</label><input class="form-control form-control-sm" name="personelAd"></div>
+          <div class="col-md-6"><label class="form-label small">Ünvan (imza / puantaj)</label><input class="form-control form-control-sm" name="personelUnvan"></div>
+          <div class="col-md-6"><label class="form-label small">Ünvan (ek özel / araç cetveli)</label><input class="form-control form-control-sm" name="personelUnvanCetvel"></div>
+          <div class="col-md-6"><label class="form-label small">Ünvan (seyyar cetveli)</label><input class="form-control form-control-sm" name="personelUnvanSeyyar"></div>
+          <div class="col-12"><label class="form-label small">Şube</label><input class="form-control form-control-sm" name="sube"></div>
+          <div class="col-md-6"><label class="form-label small">Şube müdürü</label><input class="form-control form-control-sm" name="subeMuduruAd"></div>
+          <div class="col-md-6"><label class="form-label small">Şube müdürü ünvanı</label><input class="form-control form-control-sm" name="subeMuduruUnvan"></div>
+          <div class="col-md-6"><label class="form-label small">İl müdür yardımcısı</label><input class="form-control form-control-sm" name="ilMudYrdAd"></div>
+          <div class="col-md-6"><label class="form-label small">İl müdür yardımcısı ünvanı</label><input class="form-control form-control-sm" name="ilMudYrdUnvan"></div>
+          <div class="col-12"><label class="form-label small">OCR'da gideceği yer aranırken atlanacak adlar (aracı sevk eden amir vb., virgülle)</label><input class="form-control form-control-sm" name="ocrHaricAdlar"></div>
+          <div class="col-12 small text-muted">HTML çıktılarında imza alanları EDYS şablonundaki (@IMZA_1), (@IMZA_2), (@IMZA_3) olarak kalır; adlar yalnızca Excel çıktısına yazılır.</div>
+        </div></div>
+        <div class="card mt-3"><div class="card-header">Puantaj</div><div class="card-body row g-2">
+          <div class="col-md-3"><label class="form-label small">Mesai başı</label><input class="form-control form-control-sm" name="mesaiBas"></div>
+          <div class="col-md-3"><label class="form-label small">Mesai sonu</label><input class="form-control form-control-sm" name="mesaiBit"></div>
+          <div class="col-md-6"><label class="form-label small">Kontrol türü</label><input class="form-control form-control-sm" name="puantajKontrolTuru"></div>
+          <div class="col-12"><label class="form-label small">Dayandığı mevzuat</label><input class="form-control form-control-sm" name="puantajMevzuat"></div>
+          <div class="col-12">
+            <label class="form-label small">Resmî tatiller (her satıra: GG.AA.YYYY; Ad; yarım)</label>
+            <textarea class="form-control form-control-sm font-monospace" name="tatiller" rows="8"></textarea>
+            <div class="form-text">"yarım" yazılan günler (arife) 5 saatin altında kaldığı için puantaja yazılmaz.</div>
+          </div>
+        </div></div>
+      </div>
+      <div class="col-lg-6">
+        <div class="card"><div class="card-header">EDYS sayı alanı</div><div class="card-body row g-2">
+          <div class="col-12"><label class="form-label small">Görev emri sayı öneki (OCR tamamlaması için, örn. E-12345678-123.45.67-)</label><input class="form-control form-control-sm" name="sayiOnek"></div>
+          <div class="col-12 small text-muted">Her şablonun EDYS'deki sayı parçasını (td'li ya da p'li hali) buraya yapıştırınız; olduğu gibi başlığa konur. Boş bırakılırsa sayı satırı çıkmaz.</div>
+          <div class="col-12"><label class="form-label small">Ek özel hizmet</label><textarea class="form-control form-control-sm font-monospace" name="sayiEkOzel" rows="2"></textarea></div>
+          <div class="col-12"><label class="form-label small">Araç kullanma</label><textarea class="form-control form-control-sm font-monospace" name="sayiArac" rows="2"></textarea></div>
+          <div class="col-12"><label class="form-label small">Seyyar görev</label><textarea class="form-control form-control-sm font-monospace" name="sayiSeyyar" rows="2"></textarea></div>
+        </div></div>
+        <div class="card mt-3"><div class="card-header">Seyyar görev – mahalli dışı yerler</div><div class="card-body">
+          <label class="form-label small">Her satıra: İlçe: Mahalle1, Mahalle2, …</label>
+          <textarea class="form-control form-control-sm font-monospace" name="mahalliDisi" rows="10"></textarea>
+        </div></div>
+        <div class="card mt-3"><div class="card-header">Kişiler (OCR eşleştirmesi ve öneriler)</div><div class="card-body">
+          <label class="form-label small">Her satıra: Ad SOYAD; Ünvan</label>
+          <textarea class="form-control form-control-sm font-monospace" id="kisilerAlan" rows="8"></textarea>
+        </div></div>
+      </div>
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-save"></i> Kaydet</button>
+        <button class="btn btn-outline-secondary" type="button" id="ornekVeri">Örnek (uydurma) veriyi içe aktar</button>
+        <span id="ayarDurum" class="align-self-center small text-success"></span>
+      </div>
+    </form>
+  </section>
+</main>
+
+<!-- Görev düzenleme -->
+<div class="modal fade" id="gorevModal" tabindex="-1">
+  <div class="modal-dialog modal-fullscreen-lg-down modal-xl"><div class="modal-content">
+    <div class="modal-header py-2"><h6 class="modal-title">Görev emri</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div class="row g-3">
+        <div class="col-lg-7" id="gorselKutu">
+          <div class="gorsel-cerceve"><img id="gorsel" alt="Görev emri"></div>
+          <div class="d-flex gap-2 mt-2">
+            <a id="gorselAc" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="bi bi-box-arrow-up-right"></i> Yeni sekmede aç</a>
+            <button class="btn btn-outline-secondary btn-sm" id="ocrTekrar" type="button"><i class="bi bi-arrow-repeat"></i> OCR'ı tekrar çalıştır</button>
+          </div>
+        </div>
+        <div class="col-lg-5">
+          <form id="gorevForm" class="row g-2">
+            <input type="hidden" name="_id">
+            <div class="col-6"><label class="form-label small mb-0">Görev tarihi</label><input type="date" class="form-control form-control-sm" name="tarih" required></div>
+            <div class="col-6"><label class="form-label small mb-0">Belge no (6 hane)</label><input class="form-control form-control-sm" name="belgeNo" inputmode="numeric"></div>
+            <div class="col-12"><label class="form-label small mb-0">Sayı</label><input class="form-control form-control-sm" name="sayi"></div>
+            <div class="col-12"><label class="form-label small mb-0">Görevin türü</label><input class="form-control form-control-sm" name="gorevTuru"></div>
+            <div class="col-12">
+              <label class="form-label small mb-0">Gideceği yer <span class="text-muted">(İlçe-Mahalle, İlçe-Mahalle)</span></label>
+              <input class="form-control form-control-sm" name="yerHam">
+              <div class="form-text" id="yerOnizleme"></div>
+            </div>
+            <div class="col-6"><label class="form-label small mb-0">Plaka</label><input class="form-control form-control-sm" name="plaka" list="plakaListe"></div>
+            <div class="col-6"><label class="form-label small mb-0">Sürücü</label><input class="form-control form-control-sm" name="surucu" list="kisiListe"></div>
+            <div class="col-6"><label class="form-label small mb-0">Çıkış saati</label><input class="form-control form-control-sm" name="cikis" placeholder="09:30"></div>
+            <div class="col-6"><label class="form-label small mb-0">Dönüş saati</label><input class="form-control form-control-sm" name="donus" placeholder="16:00"></div>
+            <div class="col-12">
+              <label class="form-label small mb-0">Görevli personel (her satıra bir kişi)</label>
+              <textarea class="form-control form-control-sm" name="personel" rows="4"></textarea>
+              <div class="input-group input-group-sm mt-1">
+                <input class="form-control" id="kisiEkle" list="kisiListe" placeholder="Listeden kişi ekle">
+                <button class="btn btn-outline-secondary" type="button" id="kisiEkleBtn">Ekle</button>
+              </div>
+            </div>
+            <div class="col-12 form-check ms-1 mt-2">
+              <input class="form-check-input" type="checkbox" name="onayli" id="onayli">
+              <label class="form-check-label" for="onayli">Kontrol ettim, bilgiler doğru</label>
+            </div>
+            <div class="col-12">
+              <details><summary class="small text-muted">OCR metni</summary><pre id="ocrMetin" class="small bg-light p-2 mt-1" style="max-height:200px;overflow:auto;white-space:pre-wrap"></pre></details>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer py-2">
+      <button class="btn btn-outline-danger btn-sm me-auto" id="gorevSil" type="button"><i class="bi bi-trash"></i> Sil</button>
+      <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal" type="button">Vazgeç</button>
+      <button class="btn btn-primary btn-sm" id="gorevKaydet" type="button"><i class="bi bi-save"></i> Kaydet</button>
+    </div>
+  </div></div>
+</div>
+
+<datalist id="plakaListe"></datalist>
+<datalist id="kisiListe"></datalist>
+<div class="toast-container position-fixed bottom-0 end-0 p-3"><div id="bildirim" class="toast text-bg-dark" role="status"><div class="toast-body"></div></div></div>
+
+<script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

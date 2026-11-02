@@ -1,0 +1,6 @@
+.gorsel-cerceve { max-height: 72vh; overflow: auto; border: 1px solid var(--bs-border-color); border-radius: .375rem; background: #f8f9fa; }
+.gorsel-cerceve img { width: 100%; display: block; cursor: zoom-in; }
+.gorsel-cerceve.buyuk img { width: 180%; cursor: zoom-out; }
+#gorevTablo td { font-size: .875rem; }
+#gorevTablo tr { cursor: pointer; }
+.eksik { color: var(--bs-danger); font-style: italic; }

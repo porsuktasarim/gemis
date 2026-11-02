@@ -1,0 +1,132 @@
+# GEMİS – Görev Emri İcmal Sistemi
+
+Taşıt görev emri görüntülerinden (JPEG) aylık arazi icmallerini hazırlayan web
+uygulaması. Yapay zekâ kullanmaz. Görüntüler sunucuda Tesseract OCR (Türkçe)
+ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
+
+İcmaller EDYS şablonlarına uygun HTML olarak ve Excel olarak alınabilir.
+İcmale giren görev emirlerinin görüntüleri tek PDF olarak indirilebilir.
+
+## Özellikler
+
+- **Görev emri yükleme**
+  - JPEG/PNG görüntüler toplu olarak yüklenebilir.
+  - OCR basılı alanları doldurur: sayı, görev tarihi, görevli personel ve
+    gideceği yer.
+  - El yazısı alanlar (sürücü, plaka, saatler, belge no) çoğunlukla okunamaz.
+    Bu alanlar formdan girilir; daha önce girilen plaka ve kişiler öneri olarak
+    gelir.
+  - Dosya adında tarih varsa (`2026_10_13.jpg`, `13.10.2026.jpg`) görev tarihi
+    oradan alınır.
+- **Gideceği yer ayrıştırma**
+  - "Büyükçekmece-Tepecik, Bağcılar" gibi metinler İstanbul ilçe listesine göre
+    ilçe/mahalle olarak ayrıştırılır.
+  - Kısaltmalar (B.Çekmece vb.) tanınır.
+- **İcmaller**
+
+  | İcmal | Kapsam |
+  |---|---|
+  | Kontrol Hizmetleri Puantaj Tablosu (EK-1) | Ayın iş günleri. Resmî tatiller, yarım günler (arife) ve elle hariç tutulan izin/rapor günleri düşülür. Görev günlerinde saat aralığı görev emrindeki çıkış/dönüş saatine göre büro + arazi olarak yazılır. |
+  | Ek Özel Hizmet Tazminatı Arazi Gerçekleşme Cetveli | Bütün görev günleri |
+  | Araç Kullanarak Görev İlave Ücret Gerçekleşme Cetveli | Yalnızca personelin sürücü olduğu günler |
+  | Seyyar Görev Tazminatı Arazi Çıkış Cetveli | Yalnızca mahalli dışı yer listesindeki ilçe/mahalleler; alınmayanlar uyarı olarak gösterilir |
+  | Görev emirleri listesi | Kişi bazında; sürücü ve görevli personel ayrı satırlarda |
+
+- **Çıktılar**
+  - HTML kaynağını kopyalama
+  - Excel'e yapıştırılabilir tablo kopyalama
+  - .xlsx ve .html indirme
+  - Görev emri görüntülerinin PDF'i
+- **EDYS uyumu**
+  - İmza alanları `(@IMZA_1)` personel, `(@IMZA_2)` şube müdürü ve
+    `(@IMZA_3)` il müdür yardımcısı olarak kalır.
+  - Sayı alanı için her şablonun kendi `sablon_sayi-…` parçası Ayarlar'a
+    yapıştırılır.
+
+## Kurulum
+
+Windows'ta Docker Desktop (WSL 2), Linux'ta Docker Engine ve Compose eklentisi
+yeterlidir.
+
+```bash
+git clone https://github.com/porsuktasarim/gemis.git
+cd gemis
+docker compose up -d --build
+```
+
+Tarayıcıdan `http://localhost:3000` adresi açılır.
+
+| İşlem | Komut |
+|---|---|
+| Durdurma | `docker compose down` |
+| Güncelleme | `git pull && docker compose up -d --build` |
+| Kayıtlar | Docker birimi `mongo-data` |
+| Görüntüler | Docker birimi `uploads` |
+
+`docker compose down` birimleri silmez; `down -v` kullanılırsa bütün veriler
+silinir.
+
+### Eski işlemciler
+
+MongoDB 5 ve üstü AVX destekli işlemci ister. `docker compose logs mongo`
+çıktısında AVX hatası görülürse `docker-compose.yml` içindeki `mongo:7` yerine
+`mongo:4.4` yazılmalıdır.
+
+### Ağdaki başka bilgisayardan erişim
+
+`http://SUNUCU-IP:3000` ile açılabilir. Tarayıcılar http adreslerinde pano
+erişimini kısıtladığı için kopyalama eski yönteme geçer. Gerekirse .xlsx/.html
+indirme seçenekleri kullanılmalıdır.
+
+### Docker olmadan (geliştirme)
+
+Node.js 20+, MongoDB ve `tesseract-ocr` + `tesseract-ocr-tur` paketleri
+kurulu olmalıdır.
+
+```bash
+npm install
+MONGO_URL=mongodb://localhost:27017/gemis npm start
+```
+
+## İlk kullanım
+
+1. **Ayarlar** ekranında şunlar girilmelidir:
+   - Personel adı ve ünvanlar
+   - İmzacılar
+   - Görev emri sayı öneki
+   - EDYS sayı parçaları
+   - Resmî tatiller (dini bayram tarihleri her yıl Resmî Gazete'den
+     doğrulanmalıdır)
+   - Mahalli dışı yerler
+   - Kişi listesi
+2. Denemek için **"Örnek (uydurma) veriyi içe aktar"** ile Ekim 2026'ya ait 10
+   uydurma görev yüklenebilir.
+3. **Görev Emirleri** sekmesinde JPEG'ler yüklenir. Her kayıt açılıp kontrol
+   edilir, eksikler tamamlanır ve "Kontrol ettim" işaretlenir.
+4. **İcmaller** sekmesinde tür ve ay seçilip "Oluştur"a basılır. Uyarı
+   kutusunda eksik alanlar ve cetvele alınmayan yerler listelenir.
+
+## Varsayılan veriler
+
+`seed/varsayilan.js` şunları içerir:
+- 2026–2027 resmî tatilleri
+- İlçe belediye yazılarına göre mahalli dışı yerler
+- Uydurma bir kişi listesi
+- Uydurma örnek görev emirleri
+
+Örnek verideki adlar, plakalar ve evrak numaraları gerçek değildir. Gerçek
+görev emirleri ve kişisel bilgiler bu depoya eklenmemelidir; uygulama verileri
+yalnızca kurulduğu bilgisayardaki Docker birimlerinde tutar.
+
+## Klasör yapısı
+
+```
+src/server.js        API ve statik dosyalar
+src/ocr.js           Tesseract ile okuma ve alan çıkarma
+src/util.js          Türkçe metin, tarih, ilçe/mahalle ayrıştırma
+src/icmal/           İcmal HTML/Excel üreticileri
+src/disaktar.js      .xlsx ve PDF üretimi
+src/models.js        MongoDB şemaları ve varsayılan ayarlar
+public/              Arayüz (Bootstrap 5)
+seed/varsayilan.js   Tatiller, mahalli dışı yerler, uydurma örnek veriler
+```
