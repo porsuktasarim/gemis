@@ -196,9 +196,14 @@
               <div class="card card-secondary card-outline mt-3"><div class="card-header"><h3 class="card-title">Kişiler</h3></div><div class="card-body">
                 <label class="form-label small">Her satıra: Ad SOYAD; Görevi; Ünvanı</label>
                 <textarea class="form-control form-control-sm font-monospace" id="kisilerAlan" rows="10" placeholder="Ali YILMAZ; Mühendis; Ziraat Yüksek Mühendisi"></textarea>
-                <div class="form-text">İcmaller her kişi için ayrı hazırlanır; personel seçiminde "Ad SOYAD - Görevi" görünür. Görevi imza ve puantajda, ünvanı cetvellerin ÜNVANI satırında kullanılır (boşsa görevi yazılır). Görev emirlerinden okunan adlar en benzeyen kişiye bağlanır; aynı kişinin farklı yazımları tek kayıtta birleştirilir.</div>
+                <div class="form-text">Kontrol edilip onaylanan görev emirlerindeki yeni kişiler kendiliğinden eklenir. İcmaller her kişi için ayrı hazırlanır; personel seçiminde "Ad SOYAD - Görevi" görünür. Görevi imza ve puantajda, ünvanı cetvellerin ÜNVANI satırında kullanılır (boşsa görevi yazılır). Görev emirlerinden okunan adlar en benzeyen kişiye bağlanır; aynı kişinin farklı yazımları tek kayıtta birleştirilir.</div>
                 <label class="form-label small mt-2">OCR'da gideceği yer aranırken atlanacak adlar (aracı sevk eden amir vb., virgülle)</label>
                 <input class="form-control form-control-sm" name="ocrHaricAdlar">
+              </div></div>
+              <div class="card card-secondary card-outline mt-3"><div class="card-header"><h3 class="card-title">Plakalar</h3></div><div class="card-body">
+                <label class="form-label small">Her satıra: Plaka; Açıklama (isteğe bağlı)</label>
+                <textarea class="form-control form-control-sm font-monospace" id="plakalarAlan" rows="8" placeholder="34 ABC 123; Doblo"></textarea>
+                <div class="form-text">Önerilerde ve el yazısı plakaların düzeltilmesinde kullanılır. Kontrol edilip onaylanan görev emirlerindeki yeni plakalar kendiliğinden eklenir.</div>
               </div></div>
             </div>
             <div class="col-lg-6">
@@ -316,13 +321,14 @@
               <input class="form-control form-control-sm" name="yerHam">
               <div class="form-text" id="yerOnizleme"></div>
             </div>
-            <div class="col-6"><label class="form-label small mb-0">Plaka</label><input class="form-control form-control-sm" name="plaka" list="plakaListe"></div>
-            <div class="col-6"><label class="form-label small mb-0">Sürücü</label><input class="form-control form-control-sm" name="surucu" list="kisiListe"></div>
+            <div class="col-6"><label class="form-label small mb-0">Plaka</label><input class="form-control form-control-sm" name="plaka" list="plakaListe"><div class="form-text" id="plakaBilgi"></div></div>
+            <div class="col-6"><label class="form-label small mb-0">Sürücü</label><input class="form-control form-control-sm" name="surucu" list="kisiListe"><div class="form-text" id="surucuBilgi"></div></div>
             <div class="col-6"><label class="form-label small mb-0">Çıkış saati</label><input class="form-control form-control-sm" name="cikis" placeholder="09:30"></div>
             <div class="col-6"><label class="form-label small mb-0">Dönüş saati</label><input class="form-control form-control-sm" name="donus" placeholder="16:00"></div>
             <div class="col-12">
               <label class="form-label small mb-0">Görevli personel (her satıra bir kişi)</label>
               <textarea class="form-control form-control-sm" name="personel" rows="4"></textarea>
+              <ul class="list-unstyled small mb-1 mt-1" id="personelBilgi"></ul>
               <div class="input-group input-group-sm mt-1">
                 <input class="form-control" id="kisiEkle" list="kisiListe" placeholder="Listeden kişi ekle">
                 <button class="btn btn-outline-secondary" type="button" id="kisiEkleBtn">Ekle</button>
@@ -331,6 +337,7 @@
             <div class="col-12 form-check ms-1 mt-2">
               <input class="form-check-input" type="checkbox" name="onayli" id="onayli">
               <label class="form-check-label" for="onayli">Kontrol ettim, bilgiler doğru</label>
+              <div class="form-text">İşaretli kaydedildiğinde listede olmayan kişiler ve plaka, Ayarlar'daki listelere eklenir.</div>
             </div>
             <div class="col-12">
               <details><summary class="small text-body-secondary">OCR metni</summary><pre id="ocrMetin" class="small bg-body-tertiary p-2 mt-1" style="max-height:200px;overflow:auto;white-space:pre-wrap"></pre></details>

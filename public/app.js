@@ -48,9 +48,15 @@ const sonKisiOku = () => { try { return localStorage.getItem('gemis-kisi') || ''
 const sonKisiYaz = (v) => { try { localStorage.setItem('gemis-kisi', v); } catch { /* depolama kapalı */ } };
 
 // ---------- Öneriler ----------
+// Kişi ve plaka listeleri (öneriler, formdaki görev/aynı kişi bilgisi)
+let kisiListesi = [], plakaListesi = [];
+const sadeAd = (s) => (s || '').toLocaleLowerCase('tr-TR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ı/g, 'i').replace(/[^a-z0-9]/g, '');
+const kisiBul = (ad) => kisiListesi.find(k => sadeAd(k.ad) === sadeAd(ad));
+
 async function onerileriYukle() {
   const o = await api('/api/oneriler');
-  $('#plakaListe').innerHTML = o.plakalar.map(p => `<option value="${esc(p)}">`).join('');
+  kisiListesi = o.kisiler; plakaListesi = o.plakalar;
+  $('#plakaListe').innerHTML = o.plakalar.map(p => `<option value="${esc(p.plaka)}"${p.aciklama ? ` label="${esc(p.aciklama)}"` : ''}>`).join('');
   // Kişi önerisi tek kayıttan: değer "Ad SOYAD", yanında görevi
   $('#kisiListe').innerHTML = o.kisiler.slice().sort((a, b) => a.ad.localeCompare(b.ad, 'tr'))
     .map(k => `<option value="${esc(k.ad)}"${k.unvan ? ` label="${esc(k.unvan)}"` : ''}>`).join('');
@@ -135,6 +141,33 @@ const modal = new bootstrap.Modal($('#gorevModal'));
 const form = $('#gorevForm');
 let aktifGorev = null;
 
+// Formda her kişinin listedeki görevi; sürücü görevlilerden biriyse "aynı kişi"
+function kisiBilgisiGoster() {
+  const adlar = form.personel.value.split('\n').map(s => s.trim()).filter(Boolean);
+  const etiket = (ad) => {
+    const k = kisiBul(ad);
+    if (!k) return '<span class="badge text-bg-warning">listede yok</span>';
+    return k.unvan ? `<span class="badge text-bg-light border">${esc(k.unvan)}</span>` : '<span class="badge text-bg-light border">görevi girilmemiş</span>';
+  };
+  const sur = form.surucu.value.trim();
+  $('#personelBilgi').innerHTML = adlar.map(ad => {
+    const k = kisiBul(ad);
+    const yazim = k && k.ad !== ad ? ` <span class="text-body-secondary">→ ${esc(k.ad)}</span>` : '';
+    const ayni = sur && sadeAd(sur) === sadeAd(ad) ? ' <span class="badge text-bg-info">aynı zamanda sürücü</span>' : '';
+    return `<li><i class="bi bi-person"></i> ${esc(ad)}${yazim} ${etiket(ad)}${ayni}</li>`;
+  }).join('');
+  if (!sur) { $('#surucuBilgi').innerHTML = ''; }
+  else {
+    const k = kisiBul(sur);
+    const gorevli = adlar.some(a => sadeAd(a) === sadeAd(sur));
+    $('#surucuBilgi').innerHTML = `${etiket(sur)}${gorevli ? ' <span class="badge text-bg-info">görevlilerden biri</span>' : ''}${k && k.ad !== sur ? ` <span class="text-body-secondary">→ ${esc(k.ad)}</span>` : ''}`;
+  }
+  const p = form.plaka.value.trim();
+  const pk = p && plakaListesi.find(x => sadeAd(x.plaka) === sadeAd(p));
+  $('#plakaBilgi').innerHTML = !p ? '' : pk ? `<span class="badge text-bg-light border">listede${pk.aciklama ? ': ' + esc(pk.aciklama) : ''}</span>` : '<span class="badge text-bg-warning">listede yok</span>';
+}
+['personel', 'surucu', 'plaka'].forEach(n => form[n].addEventListener('input', kisiBilgisiGoster));
+
 function formDoldur(g) {
   form._id.value = g._id || '';
   form.tarih.value = g.tarih || '';
@@ -149,6 +182,7 @@ function formDoldur(g) {
   form.onayli.checked = !!g.onayli;
   $('#ocrMetin').textContent = g.ocrMetin || '';
   yerOnizle();
+  kisiBilgisiGoster();
 }
 
 async function gorevAc(id) {
@@ -257,6 +291,7 @@ async function secimOku(alan, x, y, w, h) {
         form.personel.value = l.join('\n');
       } else alanEl.value = j.deger;
       if (alan === 'yerHam') yerOnizle();
+      kisiBilgisiGoster();
       alanEl.classList.add('is-valid'); setTimeout(() => alanEl.classList.remove('is-valid'), 2500);
       $('#secimIpucu').innerHTML = `<span class="text-success"><i class="bi bi-check-circle"></i> ${ALAN_ADI[alan]}: ${esc(Array.isArray(j.deger) ? j.deger.join(', ') : j.deger)}</span>`;
     } else {
@@ -277,6 +312,7 @@ $('#kisiEkleBtn').addEventListener('click', () => {
   const l = form.personel.value.split('\n').map(s => s.trim()).filter(Boolean);
   if (!l.includes(ad)) l.push(ad);
   form.personel.value = l.join('\n'); $('#kisiEkle').value = '';
+  kisiBilgisiGoster();
 });
 
 $('#ocrTekrar').addEventListener('click', async () => {
@@ -297,6 +333,7 @@ $('#ocrTekrar').addEventListener('click', async () => {
   if (!form.donus.value && o.donus) form.donus.value = o.donus;
   if (!form.personel.value.trim() && o.personel?.length) form.personel.value = o.personel.join('\n');
   $('#ocrMetin').textContent = o.ocrMetin || '';
+  kisiBilgisiGoster();
   bildir('Boş alanlar OCR sonucuyla dolduruldu.');
 });
 
@@ -414,7 +451,8 @@ $('#kopyalaTablo').addEventListener('click', async () => {
 // ---------- Ayarlar ----------
 const af = $('#ayarForm');
 async function ayarlariYukle() {
-  const [a, kisiler] = await Promise.all([api('/api/ayarlar'), api('/api/kisiler')]);
+  const [a, kisiler, plakalar] = await Promise.all([api('/api/ayarlar'), api('/api/kisiler'), api('/api/plakalar')]);
+  $('#plakalarAlan').value = plakalar.map(p => [p.plaka, p.aciklama].filter(Boolean).join('; ')).join('\n');
   for (const el of af.elements) {
     if (!el.name || el.name === 'tatiller' || el.name === 'mahalliDisi') continue;
     if (el.type === 'checkbox') { el.checked = !!a[el.name]; continue; }
@@ -450,6 +488,9 @@ af.addEventListener('submit', async (e) => {
     .map(p => ({ ad: p[0], unvan: p[1] || '', unvanCetvel: p[2] || '' }));
   await api('/api/ayarlar', { method: 'PUT', body: JSON.stringify(veri) });
   await api('/api/kisiler', { method: 'PUT', body: JSON.stringify(kisiler) });
+  const plakalar = $('#plakalarAlan').value.split('\n').map(s => s.split(';').map(x => x.trim())).filter(p => p[0])
+    .map(p => ({ plaka: p[0], aciklama: p[1] || '' }));
+  await api('/api/plakalar', { method: 'PUT', body: JSON.stringify(plakalar) });
   await ayarlariYukle(); gorevleriYukle(); kisiSecimiYukle();
   $('#ayarDurum').textContent = 'Kaydedildi.'; setTimeout(() => { $('#ayarDurum').textContent = ''; }, 2500);
   onerileriYukle();

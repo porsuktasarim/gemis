@@ -65,6 +65,17 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
   - Kişi listesindeki her satır şu biçimdedir: `Ad SOYAD; Görevi; Ünvanı`. Örnek: `Ali YILMAZ; Mühendis; Ziraat Yüksek Mühendisi`.
   - Görev emirlerinden okunan ve elle yazılan adlar en benzeyen kayıtlı kişiye bağlanır. Ada karışan ünvan ayrılır ("Uğur TÜRKELİ İMÜHENDİS" → "Uğur TÜRKELİ", görevi Mühendis).
   - Aynı kişinin farklı yazımları ("Uğur Türkeli", "uğur türkeli") tek kayıtta birleştirilir. Önceki sürümlerden kalan yinelenen kişiler açılışta kendiliğinden birleştirilir ve görev kayıtlarındaki adlar düzeltilir.
+- **Plaka listesi**
+  - Ayarlar'da kişi listesi gibi düzenlenir. Her satır şu biçimdedir: `Plaka; Açıklama`.
+  - Önerilerde ve el yazısı plakaların düzeltilmesinde kullanılır.
+- **Listelere yalnızca onaylananlar eklenir**
+  - Listede olmayan kişiler ve plakalar, görev emri "Kontrol ettim" işaretlenip kaydedildiğinde listeye eklenir.
+  - OCR'ın kontrol edilmemiş okumaları listeleri değiştirmez.
+  - Belgenin ünvan sütunundan okunan görev (Mühendis, İşçi…) yeni kişiye yazılır.
+- **Görev ve aynı kişi bilgisi**
+  - Düzenleme formunda her görevlinin ve sürücünün listedeki görevi gösterilir. Sürücünün şoför mü mühendis mi olduğu ve görevlilerden biriyle aynı kişi olup olmadığı görülür.
+  - Listede olmayan adlar ve plakalar işaretlenir.
+  - OCR benzer adlar arasında karar verirken belgedeki ünvanı ve görevli listesini dikkate alır.
 - **Belge no**
   - Görev emirleri belge no ile izlenir. Aynı belge yeniden yüklendiğinde yeni kayıt açılmaz, mevcut kayıt güncellenir.
 - **İcmaller**

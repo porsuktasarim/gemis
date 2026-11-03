@@ -19,6 +19,7 @@ const GorevSchema = new mongoose.Schema({
   driveAd: String,                              // Drive'daki dosya adı / alt klasör yolu
   ocrMetin: String,
   onayli: { type: Boolean, default: false },
+  okunanUnvanlar: { type: Object, default: {} },   // OCR'ın ünvan sütunundan okuduğu { ad: görev }; onaylanınca yeni kişiye yazılır
   ornek: { type: Boolean, default: false }          // uydurma örnek veri (gerçek belgelerle eşleştirilmez)
 }, { timestamps: true });
 
@@ -30,6 +31,9 @@ const KisiSchema = new mongoose.Schema({
   unvanCetvel: String,   // ünvanı
   unvanSeyyar: String    // eski sürümden kalan alan; açılışta ünvanı'na taşınır
 });
+
+// Plaka listesi: OCR eşleştirmesi ve öneriler için. Onaylanan (kontrol edilen) görevlerden ya da Ayarlar'dan eklenir.
+const PlakaSchema = new mongoose.Schema({ plaka: { type: String, unique: true }, aciklama: String });
 
 const TatilSchema = new mongoose.Schema({ tarih: String, ad: String, yarim: Boolean }, { _id: false });
 const MdSchema = new mongoose.Schema({ ilce: String, mahalleler: [String], not: String }, { _id: false });
@@ -68,5 +72,6 @@ const AyarSchema = new mongoose.Schema({
 module.exports = {
   Gorev: mongoose.model('Gorev', GorevSchema),
   Kisi: mongoose.model('Kisi', KisiSchema),
+  Plaka: mongoose.model('Plaka', PlakaSchema),
   Ayar: mongoose.model('Ayar', AyarSchema)
 };

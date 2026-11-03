@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
-const { Gorev, Kisi, Ayar } = require('./models');
+const { Gorev, Kisi, Ayar, Plaka } = require('./models');
 const { gorevOku } = require('./ocr');
 const { secimOku } = require('./secimOku');
 const { icmalUret, TURLER } = require('./icmal');
@@ -13,7 +13,7 @@ const { excelUret, pdfUret } = require('./disaktar');
 const { yerAyristir, saatNormal } = require('./util');
 const drive = require('./drive');
 const elyazisi = require('./elyazisi');
-const { kanonikAd, adUnvanAyir, adBicim, unvanBul } = require('./kisiler');
+const { kanonikAd, adUnvanAyir, adBicim, unvanBul, plakaBicim } = require('./kisiler');
 const { sade } = require('./util');
 const { gorevDuzelt, gorevleriOnar } = require('./duzelt');
 const varsayilan = require('../seed/varsayilan');
@@ -66,6 +66,11 @@ async function ilkKurulum() {
   if (!(await Kisi.countDocuments())) await Kisi.insertMany(varsayilan.kisiler);
   await gorevleriOnar(Gorev);
   await kisilerToparla();
+  // Plaka listesi ilk kez kuruluyorsa onaylanmış görevlerdeki plakalarla başlar
+  if (!(await Plaka.countDocuments())) {
+    const onayli = (await Gorev.distinct('plaka', { onayli: true })).map(plakaBicim).filter(p => /^\d{2} [A-ZÇĞİÖŞÜ]{1,3} \d{2,5}$/.test(p));
+    if (onayli.length) await Plaka.insertMany([...new Set(onayli)].map(plaka => ({ plaka })), { ordered: false }).catch(() => {});
+  }
 }
 
 // Aynı kişinin farklı yazımlarını birleştirir, ada karışmış ünvanları ayırır ("Uğur TÜRKELİ İMÜHENDİS"),
@@ -118,28 +123,30 @@ async function kisilerToparla() {
 function gorevTemizle(b) {
   const g = { ...b };
   ['tarih', 'sayi', 'belgeNo', 'gorevTuru', 'yerHam', 'plaka', 'surucu'].forEach(k => { if (typeof g[k] === 'string') g[k] = g[k].trim(); });
-  if (g.plaka) g.plaka = g.plaka.toLocaleUpperCase('tr-TR').replace(/\s+/g, ' ');
+  if (g.plaka) g.plaka = plakaBicim(g.plaka);
   if (typeof g.yerHam === 'string') g.yer = yerAyristir(g.yerHam);
   if (g.cikis !== undefined) g.cikis = saatNormal(g.cikis);
   if (g.donus !== undefined) g.donus = saatNormal(g.donus);
   if (Array.isArray(g.personel)) g.personel = [...new Set(g.personel.map(s => s.trim()).filter(Boolean))];
-  for (const k of ['_id', 'dosya', 'driveId', 'driveAd', 'ocrMetin', 'createdAt', 'updatedAt']) delete g[k];
+  for (const k of ['_id', 'dosya', 'driveId', 'driveAd', 'ocrMetin', 'okunanUnvanlar', 'createdAt', 'updatedAt']) delete g[k];
   return g;
 }
 
-// Görevdeki adları kayıtlı kişilere bağla; kayıtlı olmayanları (ünvanıyla) kişi listesine ekle.
+// Görevdeki adları kayıtlı kişilere bağla (aynı kişinin farklı yazımları tek ada iner).
+// ekle=true yalnızca kayıt onaylandığında ("Kontrol ettim") verilir: o zaman listede olmayan kişiler
+// (ünvanıyla) ve plaka listeye eklenir. Onaylanmamış OCR okumaları listeyi değiştirmez.
 // unvanlar: OCR'ın ünvan sütunundan okuduğu { ad: ünvan } eşlemesi
-async function adlariDuzenle(g, unvanlar = {}) {
+async function adlariDuzenle(g, unvanlar = {}, ekle = false) {
   const kisiler = await Kisi.find().lean();
-  const isle = async (ham) => {
+  const isle = async (ham, ipucu = {}) => {
     if (!ham || !String(ham).trim()) return '';
-    const r = kanonikAd(String(ham), kisiler);
+    const r = kanonikAd(String(ham), kisiler, 0.2, ipucu);
     if (!r.ad) return '';
     const unvan = r.unvan || unvanlar[ham] || unvanlar[r.ad] || '';
-    if (!r.kayitli) {
+    if (ekle && !r.kayitli) {
       await Kisi.updateOne({ ad: r.ad }, { $setOnInsert: { ad: r.ad, unvan } }, { upsert: true });
       kisiler.push({ ad: r.ad, unvan });
-    } else if (unvan) {
+    } else if (ekle && unvan && !r.kisi?.unvan) {
       await Kisi.updateOne({ ad: r.ad, $or: [{ unvan: null }, { unvan: '' }] }, { $set: { unvan } });
     }
     return r.ad;
@@ -149,7 +156,12 @@ async function adlariDuzenle(g, unvanlar = {}) {
     for (const p of g.personel) { const a = await isle(p); if (a && !l.includes(a)) l.push(a); }
     g.personel = l;
   }
-  if (typeof g.surucu === 'string') g.surucu = await isle(g.surucu);
+  // Sürücü görevlilerden biriyse aynı kişi olarak bağlanır
+  if (typeof g.surucu === 'string') g.surucu = await isle(g.surucu, { tercih: new Set(g.personel || []) });
+  if (typeof g.plaka === 'string' && g.plaka) {
+    g.plaka = plakaBicim(g.plaka);
+    if (ekle && /^\d{2} [A-ZÇĞİÖŞÜ]{1,3} \d{2,5}$/.test(g.plaka)) await Plaka.updateOne({ plaka: g.plaka }, { $setOnInsert: { plaka: g.plaka } }, { upsert: true });
+  }
   return g;
 }
 
@@ -165,7 +177,7 @@ async function ocrBaglami() {
       for (const m of y.mahalleler) if (!bilinenMahalleler[y.ilce].includes(m)) bilinenMahalleler[y.ilce].push(m);
     }
   }
-  const bilinenPlakalar = (await Gorev.distinct('plaka')).filter(Boolean);
+  const bilinenPlakalar = (await Plaka.find().lean()).map(p => p.plaka);
   return {
     kisiler, bilinenMahalleler, bilinenPlakalar,
     amirler: (ayar.ocrHaricAdlar || []).filter(Boolean)
@@ -199,7 +211,8 @@ const OCR_ALANLARI = ['tarih', 'sayi', 'belgeNo', 'yerHam', 'yer', 'plaka', 'sur
 const dolu = (v) => Array.isArray(v) ? v.length > 0 : !!v;
 
 async function kaydaIsle(okunan, gorselAlanlari) {
-  await adlariDuzenle(okunan, okunan.kisiUnvanlari || {});
+  await adlariDuzenle(okunan, okunan.kisiUnvanlari || {}, false); // OCR listeye ekleme yapmaz
+  okunan.okunanUnvanlar = okunan.kisiUnvanlari || {};
   delete okunan.kisiUnvanlari;
   // Not: koşullar $and ile birleştirilir; aynı alanı iki kez yazmak birini ezer.
   const gercek = [{ ornek: { $ne: true } }, { sayi: { $not: /^E-00000000-/ } }];
@@ -221,7 +234,7 @@ async function kaydaIsle(okunan, gorselAlanlari) {
       if (!dolu(okunan[k])) continue;
       if (!kayit.onayli || !dolu(kayit[k])) kayit[k] = okunan[k];
     }
-    Object.assign(kayit, gorselAlanlari, { ocrMetin: okunan.ocrMetin });
+    Object.assign(kayit, gorselAlanlari, { ocrMetin: okunan.ocrMetin, okunanUnvanlar: { ...(kayit.okunanUnvanlar || {}), ...okunan.okunanUnvanlar } });
     await kayit.save();
     return { kayit, durum: kayit.onayli ? 'mevcut kayda bağlandı (boş alanlar dolduruldu)' : 'mevcut kayıt OCR ile güncellendi' };
   }
@@ -257,12 +270,15 @@ app.get('/api/gorevler/:id', hata(async (req, res) => {
 }));
 
 app.post('/api/gorevler', hata(async (req, res) => {
-  const kayit = await Gorev.create(await adlariDuzenle(gorevTemizle(req.body)));
+  const g = gorevTemizle(req.body);
+  const kayit = await Gorev.create(await adlariDuzenle(g, {}, !!g.onayli));
   res.json(kayit);
 }));
 
 app.put('/api/gorevler/:id', hata(async (req, res) => {
-  const kayit = await Gorev.findByIdAndUpdate(req.params.id, await adlariDuzenle(gorevTemizle(req.body)), { new: true });
+  const g = gorevTemizle(req.body);
+  const onceki = await Gorev.findById(req.params.id, { okunanUnvanlar: 1 }).lean();
+  const kayit = await Gorev.findByIdAndUpdate(req.params.id, await adlariDuzenle(g, onceki?.okunanUnvanlar || {}, !!g.onayli), { new: true });
   res.json(kayit);
 }));
 
@@ -319,8 +335,11 @@ app.post('/api/ocr/tam', yukle.single('dosya'), hata(async (req, res) => {
 }));
 
 app.get('/api/oneriler', hata(async (req, res) => {
-  const [plakalar, suruculer, kisiler] = await Promise.all([Gorev.distinct('plaka'), Gorev.distinct('surucu'), Kisi.find().sort({ ad: 1 }).lean()]);
-  res.json({ plakalar: plakalar.filter(Boolean).sort(), suruculer: suruculer.filter(Boolean).sort(), kisiler: kisiler.map(k => ({ ad: k.ad, unvan: k.unvan || '' })) });
+  const [plakalar, kisiler] = await Promise.all([Plaka.find().sort({ plaka: 1 }).lean(), Kisi.find().sort({ ad: 1 }).lean()]);
+  res.json({
+    plakalar: plakalar.map(p => ({ plaka: p.plaka, aciklama: p.aciklama || '' })),
+    kisiler: kisiler.map(k => ({ ad: k.ad, unvan: k.unvan || '' }))
+  });
 }));
 
 // ---------- Google Drive ----------
@@ -429,6 +448,19 @@ app.put('/api/kisiler', hata(async (req, res) => {
   await Kisi.deleteMany({});
   await Kisi.insertMany([...harita.values()], { ordered: false }).catch(() => {});
   res.json(await Kisi.find().sort({ ad: 1 }).lean());
+}));
+
+app.get('/api/plakalar', hata(async (req, res) => res.json(await Plaka.find().sort({ plaka: 1 }).lean())));
+app.put('/api/plakalar', hata(async (req, res) => {
+  const harita = new Map();
+  for (const p of req.body || []) {
+    const plaka = plakaBicim(p.plaka || '');
+    if (!plaka) continue;
+    if (!harita.has(plaka)) harita.set(plaka, { plaka, aciklama: (p.aciklama || '').trim() });
+  }
+  await Plaka.deleteMany({});
+  await Plaka.insertMany([...harita.values()], { ordered: false }).catch(() => {});
+  res.json(await Plaka.find().sort({ plaka: 1 }).lean());
 }));
 
 app.post('/api/ornek-veri', hata(async (req, res) => {

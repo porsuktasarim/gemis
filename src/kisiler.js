@@ -51,7 +51,9 @@ function adBicim(ad) {
 
 // El yazısı/OCR için toleranslı eşleştirme: ad ve soyad ayrı ayrı karşılaştırılır;
 // en iyi aday ikinciden belirgin biçimde iyi değilse eşleşme yapılmaz.
-function kisiEslestir(ham, kisiler, oran = 0.3) {
+// ipucu: { unvan, tercih: Set<ad> } — yakın adaylar arasında, belgede okunan ünvanı (Mühendis/Şoför…)
+// tutan ya da tercih kümesindeki (ör. sürücü için görevli listesindeki) kişi öne alınır.
+function kisiEslestir(ham, kisiler, oran = 0.3, ipucu = {}) {
   const kelimeler = (ham || '').split(/[\s|,;:]+/).map(sade).filter(k => k.length >= 2);
   const h = kelimeler.join('');
   if (h.length < 4 || !kisiler.length) return '';
@@ -66,7 +68,10 @@ function kisiEslestir(ham, kisiler, oran = 0.3) {
     const soyadUz = Math.min(...kelimeler.map(w => uzaklik(w, soyad)));
     // yalnızca soyad güvenle okunduysa (kısa soyadlarda yanılmamak için en az 5 harf)
     const soyadPuan = soyad.length >= 5 && soyadUz <= 0.3 ? soyadUz + 0.05 : 1;
-    return { ad: k.ad, puan: Math.min(tam, parca + 0.03, soyadPuan) };
+    let puan = Math.min(tam, parca + 0.03, soyadPuan);
+    if (ipucu.unvan && k.unvan) puan += sade(k.unvan) === sade(ipucu.unvan) ? -0.06 : 0.04;
+    if (ipucu.tercih?.has(k.ad)) puan -= 0.06;
+    return { ad: k.ad, puan: Math.max(0, puan) };
   }).sort((x, y) => x.puan - y.puan);
   const [en, ikinci] = puanlar;
   if (en.puan > Math.max(oran, 0.4)) return '';
@@ -76,15 +81,22 @@ function kisiEslestir(ham, kisiler, oran = 0.3) {
 
 // Elle ya da OCR ile gelen adı kayıtlı kişiye bağlar.
 // Dönen: { ad, unvan, kayitli } — kayitli=false ise yeni kişi (biçimlendirilmiş ad)
-function kanonikAd(ham, kisiler, oran = 0.2) {
+function kanonikAd(ham, kisiler, oran = 0.2, ipucu = {}) {
   const { ad, unvan } = adUnvanAyir(ham);
   if (!ad) return { ad: '', unvan, kayitli: false };
   const s = sade(ad);
   const tam = kisiler.find(k => sade(k.ad) === s);
-  if (tam) return { ad: tam.ad, unvan, kayitli: true };
-  const yakin = kisiEslestir(ad, kisiler, oran);
-  if (yakin) return { ad: yakin, unvan, kayitli: true };
+  if (tam) return { ad: tam.ad, unvan: unvan || tam.unvan || '', kayitli: true, kisi: tam };
+  const yakin = kisiEslestir(ad, kisiler, oran, { unvan: unvan || ipucu.unvan, tercih: ipucu.tercih });
+  if (yakin) { const k = kisiler.find(x => x.ad === yakin); return { ad: yakin, unvan: unvan || k?.unvan || '', kayitli: true, kisi: k }; }
   return { ad: adBicim(ad), unvan, kayitli: false };
 }
 
-module.exports = { UNVANLAR, unvanBul, adUnvanAyir, adBicim, kisiEslestir, kanonikAd };
+// Plaka biçimi: "34 ABC 123"
+function plakaBicim(p) {
+  const t = trUpper(p || '').replace(/[^A-Z0-9ÇĞİÖŞÜ]/g, '');
+  const m = /^(\d{2})([A-ZÇĞİÖŞÜ]{1,3})(\d{2,5})$/.exec(t);
+  return m ? `${m[1]} ${m[2]} ${m[3]}` : trUpper(p || '').replace(/\s+/g, ' ').trim();
+}
+
+module.exports = { UNVANLAR, unvanBul, adUnvanAyir, adBicim, kisiEslestir, kanonikAd, plakaBicim };

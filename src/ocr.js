@@ -199,10 +199,11 @@ async function gorevOku(girdi, orijinalAd, baglam) {
   const kisiUnvanlari = {};
   (z.personel || []).forEach((ham, i) => {
     const { ad: yalin, unvan } = adUnvanAyir(ham);
-    const ad = kisiEslestir(yalin, kisiler, 0.25) || adBicimle(yalin);
+    const sutunUnvan = unvanBul((z.personelUnvan || [])[i]);
+    const ad = kisiEslestir(yalin, kisiler, 0.25, { unvan: unvan || sutunUnvan }) || adBicimle(yalin);
     if (!ad || personel.includes(ad)) return;
     personel.push(ad);
-    const u = unvan || unvanBul((z.personelUnvan || [])[i]);
+    const u = unvan || sutunUnvan;
     if (u) kisiUnvanlari[ad] = u;
   });
   for (const ad of kisileriBul(metin, kisiler)) if (!personel.includes(ad)) personel.push(ad);
@@ -216,7 +217,10 @@ async function gorevOku(girdi, orijinalAd, baglam) {
     kisiUnvanlari,
     yer,
     yerHam: yer.map(g => [g.ilce, ...g.mahalleler].join('-')).join(', '),
-    surucu: ilkGecerli(z.surucuAdaylar || [z.surucu], a => kisiEslestir(a, kisiler, 0.35)),
+    // Sürücü çoğu zaman görevlilerden biri ya da şoför kadrosundandır: bunlar yakın adaylar arasında öne alınır
+    surucu: ilkGecerli(z.surucuAdaylar || [z.surucu], a => kisiEslestir(a, kisiler, 0.35, {
+      tercih: new Set([...personel, ...kisiler.filter(k => /şoför|sofor/i.test(k.unvan || '')).map(k => k.ad)])
+    })),
     plaka: ilkGecerli(z.plakaAdaylar || [z.plaka], a => { const p = plakaCoz(a, bilinenPlakalar); return /^\d{2} [A-Z]{1,3} \d{2,4}$/.test(p) ? p : ''; }) || plakaBul(metin),
     belgeNo: belgeNoCoz(z.belgeNo),
     cikis: z.cikis || saat.cikis,
