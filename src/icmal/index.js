@@ -413,7 +413,9 @@ function icmalUret(tur, ayar, gorevler, secenek) {
   if (!f) throw new Error('Bilinmeyen icmal türü');
   if (tur === 'puantaj') secenek.bit = secenek.bas;
   const ayList = aylar(secenek.bas, secenek.bit);
-  const ayaGore = gorevler.filter(g => ayList.includes((g.tarih || '').slice(0, 7)));
+  // Hariç günler (izin, rapor…) bütün icmallerde düşülür
+  const haric = new Set(secenek.haric || []);
+  const ayaGore = gorevler.filter(g => ayList.includes((g.tarih || '').slice(0, 7)) && !haric.has(g.tarih));
   // Seçilen kişinin (görevli personel ya da sürücü olarak) bulunduğu görevler; liste "tüm kişiler" ile hepsini alır
   const tumu = tur === 'liste' && secenek.tumKisiler;
   const ad = sade(ayar.personelAd);

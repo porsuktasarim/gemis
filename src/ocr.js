@@ -7,6 +7,7 @@ const { spawn } = require('child_process');
 const sharp = require('sharp');
 const { ILCELER, sade, benzer, levenshtein, yerAyristir, tarihISO, saatNormal, trTitle } = require('./util');
 const { bolgeselOku } = require('./zon');
+const { kisiEslestir, adBicim: adBicimle, adUnvanAyir, unvanBul } = require('./kisiler');
 
 function tesseract(png, psm) {
   return new Promise((resolve) => {
@@ -150,32 +151,6 @@ function ilkGecerli(adaylar, coz) {
   return '';
 }
 
-// Kişi adı eşleştirme (el yazısı için daha toleranslı).
-// Ad ve soyad ayrı ayrı karşılaştırılır; en iyi aday ikinciden belirgin biçimde iyi değilse eşleşme yapılmaz.
-function kisiEslestir(ham, kisiler, oran = 0.3) {
-  const kelimeler = (ham || '').split(/[\s|,;:]+/).map(sade).filter(k => k.length >= 2);
-  const h = kelimeler.join('');
-  if (h.length < 4 || !kisiler.length) return '';
-  const uzaklik = (a, b) => levenshtein(a, b) / Math.max(a.length, b.length, 1);
-  const puanlar = kisiler.map(k => {
-    const p = k.ad.split(/\s+/).map(sade).filter(Boolean);
-    const tam = uzaklik(h, p.join(''));
-    let parca = 1;
-    if (kelimeler.length >= 2 && p.length >= 2) {
-      parca = (uzaklik(kelimeler[0], p[0]) + uzaklik(kelimeler[kelimeler.length - 1], p[p.length - 1])) / 2;
-    }
-    const soyad = p[p.length - 1];
-    const soyadUz = Math.min(...kelimeler.map(w => uzaklik(w, soyad)));
-    // yalnızca soyad güvenle okunduysa (kısa soyadlarda yanılmamak için en az 5 harf)
-    const soyadPuan = soyad.length >= 5 && soyadUz <= 0.3 ? soyadUz + 0.05 : 1;
-    return { ad: k.ad, puan: Math.min(tam, parca + 0.03, soyadPuan) };
-  }).sort((x, y) => x.puan - y.puan);
-  const [en, ikinci] = puanlar;
-  if (en.puan > Math.max(oran, 0.4)) return '';
-  if (en.puan > oran && ikinci && ikinci.puan - en.puan < 0.12) return '';
-  return en.ad;
-}
-
 function plakaCoz(ham, bilinen = []) {
   const t = (ham || '').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
   // Rakam bölümünde el yazısında sık karışan harfler rakama çevrilir (Z→2, O→0, S→5, B→8, G→6, I→1)
@@ -207,12 +182,6 @@ function yerOnIsle(t) {
   return s.replace(/B\.\s*Çekmece/giu, 'Büyükçekmece').replace(/K\.\s*Çekmece/giu, 'Küçükçekmece');
 }
 
-// Ad soyad biçimi: soyad büyük harf, ad baş harfi büyük
-function adBicimle(ad) {
-  const p = ad.split(/\s+/);
-  return p.map((w, i) => i === p.length - 1 ? w.toLocaleUpperCase('tr-TR') : trTitle(w)).join(' ');
-}
-
 // baglam: { kisiler:[{ad}], amirler:[ad], bilinenMahalleler:{ilce:[mahalle]}, sayiOnek, bilinenPlakalar:[...] }
 async function gorevOku(girdi, orijinalAd, baglam) {
   const { kisiler = [], amirler = [], bilinenMahalleler = {}, sayiOnek = '', bilinenPlakalar = [] } = baglam || {};
@@ -225,11 +194,17 @@ async function gorevOku(girdi, orijinalAd, baglam) {
   if (!yer.length) yer = yerBul(metin, haric, bilinenMahalleler);
 
   // Personel: hücrelerden okunan adlar (bilinen kişiyle eşleşirse o ad), artı tam metinde bulunan bilinen kişiler
+  // Ünvan sütunu ya da ada karışan ünvan ("Uğur TÜRKELİ İMÜHENDİS") ayrılır; yeni kişiler için görev olarak döner
   const personel = [];
-  for (const ham of z.personel || []) {
-    const ad = kisiEslestir(ham, kisiler, 0.25) || adBicimle(ham);
-    if (!personel.includes(ad)) personel.push(ad);
-  }
+  const kisiUnvanlari = {};
+  (z.personel || []).forEach((ham, i) => {
+    const { ad: yalin, unvan } = adUnvanAyir(ham);
+    const ad = kisiEslestir(yalin, kisiler, 0.25) || adBicimle(yalin);
+    if (!ad || personel.includes(ad)) return;
+    personel.push(ad);
+    const u = unvan || unvanBul((z.personelUnvan || [])[i]);
+    if (u) kisiUnvanlari[ad] = u;
+  });
   for (const ad of kisileriBul(metin, kisiler)) if (!personel.includes(ad)) personel.push(ad);
 
   const saat = saatleriBul(metin);
@@ -238,6 +213,7 @@ async function gorevOku(girdi, orijinalAd, baglam) {
     tarih: dosyaAdiTarihi(orijinalAd) || gorevTarihiBul(`Görev Tarihi ${(z.tarih || '').split(/d[üu]zenleme/i)[0]}`) || gorevTarihiBul(metin),
     sayi: sayiBul(`Sayı ${z.sayi || ''}`, sayiOnek) || sayiBul(metin, sayiOnek),
     personel,
+    kisiUnvanlari,
     yer,
     yerHam: yer.map(g => [g.ilce, ...g.mahalleler].join('-')).join(', '),
     surucu: ilkGecerli(z.surucuAdaylar || [z.surucu], a => kisiEslestir(a, kisiler, 0.35)),

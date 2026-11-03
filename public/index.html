@@ -30,7 +30,6 @@
         <li class="nav-item d-none d-md-block"><span class="nav-link text-body-secondary">Görev Emri İcmal Sistemi</span></li>
       </ul>
       <ul class="navbar-nav ms-auto">
-        <li class="nav-item"><span class="nav-link small text-body-secondary d-none d-sm-block" id="ustPersonel"></span></li>
         <li class="nav-item"><a class="nav-link" href="#" id="temaDegistir" role="button" title="Açık / koyu tema"><i class="bi bi-circle-half"></i></a></li>
         <li class="nav-item"><a class="nav-link" href="#" data-lte-toggle="fullscreen" title="Tam ekran"><i data-lte-icon="maximize" class="bi bi-arrows-fullscreen"></i><i data-lte-icon="minimize" class="bi bi-fullscreen-exit" style="display:none"></i></a></li>
       </ul>
@@ -88,7 +87,7 @@
               <div class="small-box text-bg-warning"><div class="inner"><h3 id="ozBekleyen">0</h3><p>Kontrol bekleyen</p></div><i class="small-box-icon bi bi-hourglass-split"></i></div>
             </div>
             <div class="col-lg-3 col-6">
-              <div class="small-box text-bg-success"><div class="inner"><h3 id="ozSurucu">0</h3><p>Sürücü olunan gün</p></div><i class="small-box-icon bi bi-car-front"></i></div>
+              <div class="small-box text-bg-success"><div class="inner"><h3 id="ozBelgeNo">0</h3><p>Belge no eksik</p></div><i class="small-box-icon bi bi-123"></i></div>
             </div>
             <div class="col-lg-3 col-6">
               <div class="small-box text-bg-danger"><div class="inner"><h3 id="ozEksik">0</h3><p>Eksik bilgili kayıt</p></div><i class="small-box-icon bi bi-exclamation-triangle"></i></div>
@@ -128,22 +127,22 @@
             <div class="card-body">
               <div class="row g-2 align-items-end">
                 <div class="col-auto">
-                  <label class="form-label small mb-0" for="icmalTur">İcmal</label>
-                  <select id="icmalTur" class="form-select form-select-sm"></select>
-                </div>
-                <div class="col-auto">
                   <label class="form-label small mb-0" for="icmalKisi">Personel</label>
                   <select id="icmalKisi" class="form-select form-select-sm" style="min-width:16rem"></select>
                 </div>
                 <div class="col-auto">
-                  <label class="form-label small mb-0" for="icmalBas">Başlangıç ayı</label>
+                  <label class="form-label small mb-0" for="icmalTur">İcmal</label>
+                  <select id="icmalTur" class="form-select form-select-sm"></select>
+                </div>
+                <div class="col-auto">
+                  <label class="form-label small mb-0" for="icmalBas">Ay</label>
                   <input type="month" id="icmalBas" class="form-control form-control-sm">
                 </div>
                 <div class="col-auto" id="bitKutu">
-                  <label class="form-label small mb-0" for="icmalBit">Bitiş ayı</label>
+                  <label class="form-label small mb-0" for="icmalBit">Bitiş ayı <span class="text-body-secondary">(çok aylık cetvel)</span></label>
                   <input type="month" id="icmalBit" class="form-control form-control-sm">
                 </div>
-                <div class="col-auto" id="haricKutu">
+                <div class="col-auto">
                   <label class="form-label small mb-0" for="icmalHaric">Hariç günler (izin, rapor…)</label>
                   <input type="text" id="icmalHaric" class="form-control form-control-sm" placeholder="05.10.2026, 12.10.2026" style="min-width:16rem">
                 </div>
@@ -178,20 +177,8 @@
         <section class="sekme" id="sekme-ayarlar" hidden>
           <form id="ayarForm" class="row g-3 mb-4">
             <div class="col-lg-6">
-              <div class="card card-primary card-outline"><div class="card-header"><h3 class="card-title">Personel ve imzacılar</h3></div><div class="card-body row g-2">
-                <div class="col-md-6"><label class="form-label small">Personel adı soyadı</label><input class="form-control form-control-sm" name="personelAd"></div>
-                <div class="col-md-6"><label class="form-label small">Ünvan (imza / puantaj)</label><input class="form-control form-control-sm" name="personelUnvan"></div>
-                <div class="col-md-6"><label class="form-label small">Ünvan (ek özel / araç cetveli)</label><input class="form-control form-control-sm" name="personelUnvanCetvel"></div>
-                <div class="col-md-6"><label class="form-label small">Ünvan (seyyar cetveli)</label><input class="form-control form-control-sm" name="personelUnvanSeyyar"></div>
-                <div class="col-12"><label class="form-label small">Şube</label><input class="form-control form-control-sm" name="sube"></div>
-                <div class="col-md-6"><label class="form-label small">Şube müdürü</label><input class="form-control form-control-sm" name="subeMuduruAd"></div>
-                <div class="col-md-6"><label class="form-label small">Şube müdürü ünvanı</label><input class="form-control form-control-sm" name="subeMuduruUnvan"></div>
-                <div class="col-md-6"><label class="form-label small">İl müdür yardımcısı</label><input class="form-control form-control-sm" name="ilMudYrdAd"></div>
-                <div class="col-md-6"><label class="form-label small">İl müdür yardımcısı ünvanı</label><input class="form-control form-control-sm" name="ilMudYrdUnvan"></div>
-                <div class="col-12"><label class="form-label small">OCR'da gideceği yer aranırken atlanacak adlar (aracı sevk eden amir vb., virgülle)</label><input class="form-control form-control-sm" name="ocrHaricAdlar"></div>
-                <div class="col-12 small text-body-secondary">HTML çıktılarında imza alanları EDYS şablonundaki (@IMZA_1), (@IMZA_2), (@IMZA_3) olarak kalır; adlar yalnızca Excel çıktısına yazılır.</div>
-              </div></div>
-              <div class="card card-secondary card-outline mt-3"><div class="card-header"><h3 class="card-title">Puantaj</h3></div><div class="card-body row g-2">
+              <div class="card card-primary card-outline"><div class="card-header"><h3 class="card-title">Genel ve puantaj</h3></div><div class="card-body row g-2">
+                <div class="col-12"><label class="form-label small">Şube (cetvellerdeki ŞUBESİ satırı)</label><input class="form-control form-control-sm" name="sube"></div>
                 <div class="col-md-3"><label class="form-label small">Mesai başı</label><input class="form-control form-control-sm" name="mesaiBas"></div>
                 <div class="col-md-3"><label class="form-label small">Mesai sonu</label><input class="form-control form-control-sm" name="mesaiBit"></div>
                 <div class="col-md-6"><label class="form-label small">Kontrol türü</label><input class="form-control form-control-sm" name="puantajKontrolTuru"></div>
@@ -202,10 +189,12 @@
                   <div class="form-text">"yarım" yazılan günler (arife) 5 saatin altında kaldığı için puantaja yazılmaz.</div>
                 </div>
               </div></div>
-              <div class="card card-secondary card-outline mt-3"><div class="card-header"><h3 class="card-title">Kişiler (OCR eşleştirmesi ve öneriler)</h3></div><div class="card-body">
-                <label class="form-label small">Her satıra: Ad SOYAD; Görevi; Cetvel ünvanı; Seyyar ünvanı</label>
-                <textarea class="form-control form-control-sm font-monospace" id="kisilerAlan" rows="8"></textarea>
-                <div class="form-text">Görevi, icmallerdeki personel seçiminde "Ad SOYAD - Görevi" olarak görünür ve imzada kullanılır (ör. Mühendis, Şoför). Cetvel ve seyyar ünvanı boşsa görevi yazılır.</div>
+              <div class="card card-secondary card-outline mt-3"><div class="card-header"><h3 class="card-title">Kişiler</h3></div><div class="card-body">
+                <label class="form-label small">Her satıra: Ad SOYAD; Görevi; Ünvanı</label>
+                <textarea class="form-control form-control-sm font-monospace" id="kisilerAlan" rows="10" placeholder="Ali YILMAZ; Mühendis; Ziraat Yüksek Mühendisi"></textarea>
+                <div class="form-text">İcmaller her kişi için ayrı hazırlanır; personel seçiminde "Ad SOYAD - Görevi" görünür. Görevi imza ve puantajda, ünvanı cetvellerin ÜNVANI satırında kullanılır (boşsa görevi yazılır). Görev emirlerinden okunan adlar en benzeyen kişiye bağlanır; aynı kişinin farklı yazımları tek kayıtta birleştirilir.</div>
+                <label class="form-label small mt-2">OCR'da gideceği yer aranırken atlanacak adlar (aracı sevk eden amir vb., virgülle)</label>
+                <input class="form-control form-control-sm" name="ocrHaricAdlar">
               </div></div>
             </div>
             <div class="col-lg-6">
@@ -243,7 +232,6 @@
                 <div class="col-12 form-text">Sürücü, plaka, saatler ve belge no için kullanılır; basılı alanlar her durumda Tesseract ile okunur. Sonuç yalnızca bilinen kişi/plakayla eşleşir ya da geçerli biçime uyarsa forma yazılır.</div>
               </div></div>
               <div class="card card-secondary card-outline mt-3"><div class="card-header"><h3 class="card-title">EDYS sayı alanı</h3></div><div class="card-body row g-2">
-                <div class="col-12"><label class="form-label small">Görev emri sayı öneki (OCR tamamlaması için, örn. E-12345678-123.45.67-)</label><input class="form-control form-control-sm" name="sayiOnek"></div>
                 <div class="col-12 small text-body-secondary">Her şablonun EDYS'deki sayı parçasını (td'li ya da p'li hali) buraya yapıştırınız; olduğu gibi başlığa konur. Boş bırakılırsa sayı satırı çıkmaz.</div>
                 <div class="col-12"><label class="form-label small">Ek özel hizmet</label><textarea class="form-control form-control-sm font-monospace" name="sayiEkOzel" rows="2"></textarea></div>
                 <div class="col-12"><label class="form-label small">Araç kullanma</label><textarea class="form-control form-control-sm font-monospace" name="sayiArac" rows="2"></textarea></div>
@@ -285,7 +273,6 @@
           <div id="secimAraclari">
             <div class="d-flex flex-wrap gap-1 align-items-center mb-1">
               <span class="small text-body-secondary me-1"><i class="bi bi-bounding-box"></i> Seçerek oku:</span>
-              <button type="button" class="btn btn-outline-primary btn-sm" data-alan="sayi">Sayı</button>
               <button type="button" class="btn btn-outline-primary btn-sm" data-alan="belgeNo">Belge no</button>
               <button type="button" class="btn btn-outline-primary btn-sm" data-alan="yerHam">Gideceği yer</button>
               <button type="button" class="btn btn-outline-primary btn-sm" data-alan="personel">Personel +</button>
@@ -319,7 +306,6 @@
             <input type="hidden" name="_id">
             <div class="col-6"><label class="form-label small mb-0">Görev tarihi</label><input type="date" class="form-control form-control-sm" name="tarih" required></div>
             <div class="col-6"><label class="form-label small mb-0">Belge no (6 hane)</label><input class="form-control form-control-sm" name="belgeNo" inputmode="numeric"></div>
-            <div class="col-12"><label class="form-label small mb-0">Sayı</label><input class="form-control form-control-sm" name="sayi"></div>
             <div class="col-12"><label class="form-label small mb-0">Görevin türü</label><input class="form-control form-control-sm" name="gorevTuru"></div>
             <div class="col-12">
               <label class="form-label small mb-0">Gideceği yer <span class="text-body-secondary">(İlçe-Mahalle, İlçe-Mahalle)</span></label>

@@ -22,12 +22,13 @@ const GorevSchema = new mongoose.Schema({
   ornek: { type: Boolean, default: false }          // uydurma örnek veri (gerçek belgelerle eşleştirilmez)
 }, { timestamps: true });
 
-// unvan: seçim listesinde "Ad SOYAD - Görevi" olarak görünen görev (Mühendis, Şoför…), imza/puantaj ünvanı
+// Kişi: Ad SOYAD; görevi (Mühendis, Şoför… — seçim listesinde "Ad SOYAD - Görevi", imza ve puantajda);
+// ünvanı (Ziraat Yüksek Mühendisi… — cetvellerdeki ÜNVANI satırı; boşsa görevi yazılır)
 const KisiSchema = new mongoose.Schema({
   ad: { type: String, unique: true },
-  unvan: String,
-  unvanCetvel: String,   // ek özel / araç cetvelindeki ünvan (boşsa unvan)
-  unvanSeyyar: String    // seyyar cetvelindeki ünvan (boşsa cetvel ünvanı)
+  unvan: String,         // görevi
+  unvanCetvel: String,   // ünvanı
+  unvanSeyyar: String    // eski sürümden kalan alan; açılışta ünvanı'na taşınır
 });
 
 const TatilSchema = new mongoose.Schema({ tarih: String, ad: String, yarim: Boolean }, { _id: false });

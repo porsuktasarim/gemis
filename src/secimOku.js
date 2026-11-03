@@ -3,7 +3,8 @@
 const sharp = require('sharp');
 const { tesseract, adTemizle } = require('./zon');
 const elyazisi = require('./elyazisi');
-const { kisiEslestir, plakaCoz, belgeNoCoz, yerOnIsle, adBicimle, sayiBul } = require('./ocr');
+const { plakaCoz, belgeNoCoz, yerOnIsle, sayiBul } = require('./ocr');
+const { kisiEslestir, adBicim: adBicimle, adUnvanAyir } = require('./kisiler');
 const { yerAyristir, yerYaz, tarihISO } = require('./util');
 
 const RAKAM = ['-c', 'tessedit_char_whitelist=0123456789:.,'];
@@ -51,7 +52,7 @@ function coz(alan, ham, baglam) {
     case 'surucu': return kisiEslestir(t.replace(/\s+/g, ' '), kisiler, 0.35);
     case 'yerHam': return yerYaz(yerAyristir(yerOnIsle(t.replace(/\n/g, ', '))));
     case 'personel':
-      return t.split(/\n+/).map(s => s.trim()).filter(Boolean)
+      return t.split(/\n+/).map(s => adUnvanAyir(s.trim()).ad).filter(Boolean)
         // Bilinen kişi ya da düzgün okunmuş (her kelimesi en az 3 harf) ad
         .map(s => kisiEslestir(s, kisiler, 0.3) || (/^[A-Za-zÇĞİÖŞÜçğıöşü]{3,}(\s+[A-Za-zÇĞİÖŞÜçğıöşü]{3,})+$/.test(adTemizle(s)) ? adBicimle(adTemizle(s)) : ''))
         .filter(Boolean);

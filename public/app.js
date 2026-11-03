@@ -34,19 +34,17 @@ $('#temaDegistir').addEventListener('click', (e) => {
   try { localStorage.setItem('gemis-tema', yeni); } catch (err) { /* tarayıcı depolaması kapalı */ }
 });
 
-// Personel adı (özet kutuları ve üst çubuk için)
-let personelAd = '';
-async function personelYukle() {
-  try { personelAd = (await api('/api/ayarlar')).personelAd || ''; } catch { personelAd = ''; }
-  $('#ustPersonel').innerHTML = personelAd ? `<i class="bi bi-person-circle me-1"></i>${esc(personelAd)}` : '';
-}
+// Son seçilen personel (icmaller) tarayıcıda hatırlanır
+const sonKisiOku = () => { try { return localStorage.getItem('gemis-kisi') || ''; } catch { return ''; } };
+const sonKisiYaz = (v) => { try { localStorage.setItem('gemis-kisi', v); } catch { /* depolama kapalı */ } };
 
 // ---------- Öneriler ----------
 async function onerileriYukle() {
   const o = await api('/api/oneriler');
   $('#plakaListe').innerHTML = o.plakalar.map(p => `<option value="${esc(p)}">`).join('');
-  const kisiler = [...new Set([...o.kisiler, ...o.suruculer])].sort((a, b) => a.localeCompare(b, 'tr'));
-  $('#kisiListe').innerHTML = kisiler.map(p => `<option value="${esc(p)}">`).join('');
+  // Kişi önerisi tek kayıttan: değer "Ad SOYAD", yanında görevi
+  $('#kisiListe').innerHTML = o.kisiler.slice().sort((a, b) => a.ad.localeCompare(b.ad, 'tr'))
+    .map(k => `<option value="${esc(k.ad)}"${k.unvan ? ` label="${esc(k.unvan)}"` : ''}>`).join('');
 }
 
 // ---------- Görev listesi ----------
@@ -58,7 +56,7 @@ async function gorevleriYukle() {
   const eksikMi = (g) => !g.yer?.length || !g.plaka || !g.surucu || !g.cikis || !g.donus;
   $('#ozToplam').textContent = liste.length;
   $('#ozBekleyen').textContent = liste.filter(g => !g.onayli).length;
-  $('#ozSurucu').textContent = liste.filter(g => personelAd && (g.surucu || '').toLocaleLowerCase('tr') === personelAd.toLocaleLowerCase('tr')).length;
+  $('#ozBelgeNo').textContent = liste.filter(g => !/^\d{6}$/.test(g.belgeNo || '')).length;
   $('#ozEksik').textContent = liste.filter(eksikMi).length;
   const bos = '<span class="eksik">—</span>';
   $('#gorevTablo').innerHTML = liste.length ? liste.map(g => `
@@ -110,7 +108,6 @@ function formDoldur(g) {
   form._id.value = g._id || '';
   form.tarih.value = g.tarih || '';
   form.belgeNo.value = g.belgeNo || '';
-  form.sayi.value = g.sayi || '';
   form.gorevTuru.value = g.gorevTuru || '4342 sayılı Mera Kanunu Uygulamaları';
   form.yerHam.value = g.yer?.length ? yerYaz(g.yer) : (g.yerHam || '');
   form.plaka.value = g.plaka || '';
@@ -168,7 +165,7 @@ $('#gorselBuyut').addEventListener('click', () => {
   $('#gorselBuyut i').className = c.classList.contains('buyuk') ? 'bi bi-zoom-out' : 'bi bi-zoom-in';
 });
 
-const ALAN_ADI = { sayi: 'Sayı', belgeNo: 'Belge no', yerHam: 'Gideceği yer', personel: 'Personel', surucu: 'Sürücü', plaka: 'Plaka', cikis: 'Çıkış saati', donus: 'Dönüş saati' };
+const ALAN_ADI = { belgeNo: 'Belge no', yerHam: 'Gideceği yer', personel: 'Personel', surucu: 'Sürücü', plaka: 'Plaka', cikis: 'Çıkış saati', donus: 'Dönüş saati' };
 let secimAlani = null;
 function secimAlaniSec(alan) {
   secimAlani = alan;
@@ -262,7 +259,6 @@ $('#ocrTekrar').addEventListener('click', async () => {
   } else { bildir('Görüntü yok.'); return; }
   // Yalnızca boş alanları doldur
   if (!form.tarih.value && o.tarih) form.tarih.value = o.tarih;
-  if (!form.sayi.value && o.sayi) form.sayi.value = o.sayi;
   if (!form.yerHam.value && o.yerHam) form.yerHam.value = o.yerHam;
   if (!form.plaka.value && o.plaka) form.plaka.value = o.plaka;
   if (!form.belgeNo.value && o.belgeNo) form.belgeNo.value = o.belgeNo;
@@ -276,7 +272,7 @@ $('#ocrTekrar').addEventListener('click', async () => {
 $('#gorevKaydet').addEventListener('click', async () => {
   if (!form.reportValidity()) return;
   const veri = {
-    tarih: form.tarih.value, belgeNo: form.belgeNo.value, sayi: form.sayi.value, gorevTuru: form.gorevTuru.value,
+    tarih: form.tarih.value, belgeNo: form.belgeNo.value, gorevTuru: form.gorevTuru.value,
     yerHam: form.yerHam.value, plaka: form.plaka.value, surucu: form.surucu.value,
     cikis: form.cikis.value, donus: form.donus.value,
     personel: form.personel.value.split('\n').map(s => s.trim()).filter(Boolean), onayli: form.onayli.checked
@@ -309,7 +305,8 @@ async function kisiSecimiYukle() {
   const onceki = $('#icmalKisi').value;
   $('#icmalKisi').innerHTML = '<option value="*" data-tum>— Tüm kişiler —</option>' +
     kisiler.map(k => `<option value="${esc(k.ad)}">${esc(k.ad)} - ${esc(k.unvan || 'görevi girilmemiş')}</option>`).join('');
-  $('#icmalKisi').value = [...$('#icmalKisi').options].some(o => o.value === onceki) ? onceki : (personelAd || kisiler[0]?.ad || '');
+  const tercih = onceki || sonKisiOku();
+  $('#icmalKisi').value = [...$('#icmalKisi').options].some(o => o.value === tercih) ? tercih : (kisiler[0]?.ad || '');
   turDegisti();
 }
 
@@ -318,19 +315,22 @@ function turDegisti() {
   const tum = $('#icmalKisi option[data-tum]');
   if (tum) {
     tum.hidden = t !== 'liste';
-    if (t !== 'liste' && $('#icmalKisi').value === '*') $('#icmalKisi').value = personelAd || $('#icmalKisi').options[1]?.value || '';
+    if (t !== 'liste' && $('#icmalKisi').value === '*') $('#icmalKisi').value = $('#icmalKisi').options[1]?.value || '';
   }
-  $('#bitKutu').hidden = t === 'puantaj';
-  $('#haricKutu').hidden = t !== 'puantaj';
+  // Bitiş ayı yalnızca çok aylık hazırlanan cetvellerde
+  $('#bitKutu').hidden = !['arac', 'seyyar', 'liste'].includes(t);
   $('#donemKutu').hidden = t !== 'seyyar';
 }
 $('#icmalTur').addEventListener('change', turDegisti);
+$('#icmalKisi').addEventListener('change', () => sonKisiYaz($('#icmalKisi').value));
 
 function sorgu() {
   const t = $('#icmalTur').value;
-  const p = new URLSearchParams({ bas: $('#icmalBas').value, bit: t === 'puantaj' ? $('#icmalBas').value : $('#icmalBit').value, kisi: $('#icmalKisi').value || '' });
+  const cokAylik = ['arac', 'seyyar', 'liste'].includes(t);
+  const bas = $('#icmalBas').value, bit = cokAylik && $('#icmalBit').value >= bas ? $('#icmalBit').value : bas;
+  const p = new URLSearchParams({ bas, bit, kisi: $('#icmalKisi').value || '' });
   const haric = $('#icmalHaric').value.split(/[,;\s]+/).map(tarihISO).filter(Boolean);
-  if (t === 'puantaj' && haric.length) p.set('haric', haric.join(','));
+  if (haric.length) p.set('haric', haric.join(','));
   if (t === 'seyyar' && $('#icmalDonem').value.trim()) p.set('donem', $('#icmalDonem').value.trim());
   return `${t}?${p}`;
 }
@@ -393,7 +393,7 @@ async function ayarlariYukle() {
     .map(t => [tarihTR(t.tarih), t.ad, t.yarim ? 'yarım' : ''].filter(Boolean).join('; ')).join('\n');
   af.mahalliDisi.value = (a.mahalliDisi || []).map(m => `${m.ilce}: ${m.mahalleler.join(', ')}`).join('\n');
   $('#kisilerAlan').value = kisiler.map(k => {
-    const p = [k.ad, k.unvan || '', k.unvanCetvel || '', k.unvanSeyyar || ''];
+    const p = [k.ad, k.unvan || '', k.unvanCetvel || k.unvanSeyyar || ''];
     while (p.length > 1 && !p[p.length - 1]) p.pop();
     return p.join('; ');
   }).join('\n');
@@ -416,10 +416,10 @@ af.addEventListener('submit', async (e) => {
   veri.mahalliDisi = af.mahalliDisi.value.split('\n').map(s => s.split(':')).filter(p => p[0].trim() && p[1])
     .map(p => ({ ilce: p[0].trim(), mahalleler: p.slice(1).join(':').split(',').map(x => x.trim()).filter(Boolean) }));
   const kisiler = $('#kisilerAlan').value.split('\n').map(s => s.split(';').map(x => x.trim())).filter(p => p[0])
-    .map(p => ({ ad: p[0], unvan: p[1] || '', unvanCetvel: p[2] || '', unvanSeyyar: p[3] || '' }));
+    .map(p => ({ ad: p[0], unvan: p[1] || '', unvanCetvel: p[2] || '' }));
   await api('/api/ayarlar', { method: 'PUT', body: JSON.stringify(veri) });
   await api('/api/kisiler', { method: 'PUT', body: JSON.stringify(kisiler) });
-  await personelYukle(); gorevleriYukle(); kisiSecimiYukle();
+  await ayarlariYukle(); gorevleriYukle(); kisiSecimiYukle();
   $('#ayarDurum').textContent = 'Kaydedildi.'; setTimeout(() => { $('#ayarDurum').textContent = ''; }, 2500);
   onerileriYukle();
 });
@@ -483,4 +483,4 @@ $('#driveTara').addEventListener('click', async () => {
 api('/api/sistem').then(d => {
   if (d.hata) { $('#sistemUyari').innerHTML = `<i class="bi bi-exclamation-octagon me-1"></i> ${esc(d.hata)} Docker imajını yeniden derleyiniz: <code>docker compose up -d --build</code>`; $('#sistemUyari').hidden = false; }
 }).catch(() => {});
-personelYukle().then(() => { gorevleriYukle(); kisiSecimiYukle(); }); onerileriYukle(); driveDurumYukle();
+gorevleriYukle(); kisiSecimiYukle(); onerileriYukle(); driveDurumYukle();

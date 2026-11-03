@@ -55,9 +55,18 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
     ilçe/mahalle olarak ayrıştırılır.
   - Kısaltmalar (B.Çekmece vb.) tanınır.
 - **Personel seçimi**
-  - Her icmal seçilen kişi için ayrı hazırlanır. Seçim "Ad SOYAD - Görevi" biçimindedir; şoförler de seçilebilir.
-  - Yalnızca o kişinin görevli personel ya da sürücü olarak bulunduğu görev emirleri, onun adı ve ünvanlarıyla icmale girer.
+  - İcmaller sayfasında sırayla Personel, İcmal, Ay ve Hariç günler seçilir.
+  - Her icmal, kişi listesindeki herhangi bir kişi için hazırlanabilir. Seçim "Ad SOYAD - Görevi" biçimindedir; şoförler de seçilebilir. Son seçilen kişi hatırlanır.
+  - Yalnızca o kişinin görevli personel ya da sürücü olarak bulunduğu görev emirleri, onun adı ve ünvanıyla icmale girer.
+  - Hariç günler (izin, rapor…) bütün icmallerde düşülür.
+  - Araç kullanma, seyyar görev ve görev listesi birden çok ay için de hazırlanabilir; bunlarda bitiş ayı seçilir.
   - Görev emirleri listesinde "Tüm kişiler" de seçilebilir.
+- **Kişiler tek kayıttır**
+  - Kişi listesindeki her satır şu biçimdedir: `Ad SOYAD; Görevi; Ünvanı`. Örnek: `Ali YILMAZ; Mühendis; Ziraat Yüksek Mühendisi`.
+  - Görev emirlerinden okunan ve elle yazılan adlar en benzeyen kayıtlı kişiye bağlanır. Ada karışan ünvan ayrılır ("Uğur TÜRKELİ İMÜHENDİS" → "Uğur TÜRKELİ", görevi Mühendis).
+  - Aynı kişinin farklı yazımları ("Uğur Türkeli", "uğur türkeli") tek kayıtta birleştirilir. Önceki sürümlerden kalan yinelenen kişiler açılışta kendiliğinden birleştirilir ve görev kayıtlarındaki adlar düzeltilir.
+- **Belge no**
+  - Görev emirleri belge no ile izlenir. Aynı belge yeniden yüklendiğinde yeni kayıt açılmaz, mevcut kayıt güncellenir.
 - **İcmaller**
 
   | İcmal | Kapsam |
@@ -183,14 +192,14 @@ MONGO_URL=mongodb://localhost:27017/gemis npm start
 ## İlk kullanım
 
 1. **Ayarlar** ekranında şunlar girilmelidir:
-   - Personel adı ve ünvanlar
-   - İmzacılar
-   - Görev emri sayı öneki
+   - Şube
    - EDYS sayı parçaları
    - Resmî tatiller (dini bayram tarihleri her yıl Resmî Gazete'den
      doğrulanmalıdır)
    - Mahalli dışı yerler
-   - Kişi listesi. Her satıra şu biçimde yazılır: `Ad SOYAD; Görevi; Cetvel ünvanı; Seyyar ünvanı`. Örnek: `Ali YILMAZ; Mühendis; Ziraat Mühendisi; Ziraat Yüksek Mühendisi`. Kişi listesi OCR'ın personel ve sürücü adlarını eşleştirmesi için de gereklidir.
+   - Kişi listesi (`Ad SOYAD; Görevi; Ünvanı`). Bu liste OCR'ın personel ve sürücü adlarını eşleştirmesi için de gereklidir.
+
+   İmzacı adları girilmez: HTML çıktılarında imza alanları EDYS şablonundaki (@IMZA_1/2/3) olarak kalır; Excel çıktısında imza satırlarına yalnızca ünvanlar yazılır.
 2. Denemek için **"Örnek (uydurma) veriyi içe aktar"** ile Ekim 2026'ya ait 10
    uydurma görev yüklenebilir.
 3. **Görev Emirleri** sekmesinde JPEG'ler yüklenir. Her kayıt açılıp kontrol

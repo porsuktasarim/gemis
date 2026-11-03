@@ -13,6 +13,8 @@ const { excelUret, pdfUret } = require('./disaktar');
 const { yerAyristir, saatNormal } = require('./util');
 const drive = require('./drive');
 const elyazisi = require('./elyazisi');
+const { kanonikAd, adUnvanAyir, adBicim, unvanBul } = require('./kisiler');
+const { sade } = require('./util');
 const varsayilan = require('../seed/varsayilan');
 
 const PORT = process.env.PORT || 1138;
@@ -54,6 +56,42 @@ async function ayarGetir() {
 async function ilkKurulum() {
   await ayarGetir();
   if (!(await Kisi.countDocuments())) await Kisi.insertMany(varsayilan.kisiler);
+  await kisilerToparla();
+}
+
+// Aynı kişinin farklı yazımlarını birleştirir, ada karışmış ünvanları ayırır ("Uğur TÜRKELİ İMÜHENDİS"),
+// görev kayıtlarındaki adları kayıtlı yazıma çevirir. Her açılışta çalışır; değişiklik yoksa bir şey yapmaz.
+async function kisilerToparla() {
+  const tum = await Kisi.find().lean();
+  const gruplar = new Map();
+  for (const k of tum) {
+    const { ad, unvan } = adUnvanAyir(k.ad);
+    const temiz = adBicim(ad) || k.ad;
+    const anahtar = sade(temiz);
+    if (!gruplar.has(anahtar)) gruplar.set(anahtar, []);
+    gruplar.get(anahtar).push({ ...k, temiz, ayrilanUnvan: unvan });
+  }
+  const donusum = new Map(); // eski ad -> yeni ad
+  for (const grup of gruplar.values()) {
+    // Ünvanı dolu ve adı düzgün yazılmış olan kalır
+    grup.sort((a, b) => (!!b.unvan - !!a.unvan) || ((b.ad === b.temiz) - (a.ad === a.temiz)));
+    const asil = grup[0];
+    const ad = grup.find(x => x.ad === x.temiz)?.ad || asil.temiz;
+    const unvan = grup.map(x => x.unvan).find(Boolean) || grup.map(x => x.ayrilanUnvan).find(Boolean) || '';
+    const unvanCetvel = grup.map(x => x.unvanCetvel || x.unvanSeyyar).find(Boolean) || '';
+    const degisti = grup.length > 1 || asil.ad !== ad || (asil.unvan || '') !== unvan || (asil.unvanCetvel || '') !== unvanCetvel;
+    if (!degisti) continue;
+    for (const x of grup) if (x.ad !== ad) donusum.set(x.ad, ad);
+    await Kisi.deleteMany({ _id: { $in: grup.map(x => x._id) } });
+    await Kisi.create({ ad, unvan, unvanCetvel });
+  }
+  if (!donusum.size) return;
+  for (const g of await Gorev.find({ $or: [{ surucu: { $in: [...donusum.keys()] } }, { personel: { $in: [...donusum.keys()] } }] })) {
+    if (donusum.has(g.surucu)) g.surucu = donusum.get(g.surucu);
+    g.personel = [...new Set((g.personel || []).map(a => donusum.get(a) || a))];
+    await g.save();
+  }
+  console.log(`Kişiler toparlandı: ${donusum.size} farklı yazım birleştirildi.`);
 }
 
 // Görev verisini temizle (formdan ya da OCR'dan gelen)
@@ -69,10 +107,30 @@ function gorevTemizle(b) {
   return g;
 }
 
-// Kişi listesine yeni adları ekle (öneri ve OCR eşleştirmesi için)
-async function kisileriKaydet(g) {
-  const adlar = [...(g.personel || []), g.surucu].filter(Boolean);
-  for (const ad of adlar) await Kisi.updateOne({ ad }, { $setOnInsert: { ad, unvan: '' } }, { upsert: true });
+// Görevdeki adları kayıtlı kişilere bağla; kayıtlı olmayanları (ünvanıyla) kişi listesine ekle.
+// unvanlar: OCR'ın ünvan sütunundan okuduğu { ad: ünvan } eşlemesi
+async function adlariDuzenle(g, unvanlar = {}) {
+  const kisiler = await Kisi.find().lean();
+  const isle = async (ham) => {
+    if (!ham || !String(ham).trim()) return '';
+    const r = kanonikAd(String(ham), kisiler);
+    if (!r.ad) return '';
+    const unvan = r.unvan || unvanlar[ham] || unvanlar[r.ad] || '';
+    if (!r.kayitli) {
+      await Kisi.updateOne({ ad: r.ad }, { $setOnInsert: { ad: r.ad, unvan } }, { upsert: true });
+      kisiler.push({ ad: r.ad, unvan });
+    } else if (unvan) {
+      await Kisi.updateOne({ ad: r.ad, $or: [{ unvan: null }, { unvan: '' }] }, { $set: { unvan } });
+    }
+    return r.ad;
+  };
+  if (Array.isArray(g.personel)) {
+    const l = [];
+    for (const p of g.personel) { const a = await isle(p); if (a && !l.includes(a)) l.push(a); }
+    g.personel = l;
+  }
+  if (typeof g.surucu === 'string') g.surucu = await isle(g.surucu);
+  return g;
 }
 
 async function ocrBaglami() {
@@ -88,8 +146,8 @@ async function ocrBaglami() {
   }
   const bilinenPlakalar = (await Gorev.distinct('plaka')).filter(Boolean);
   return {
-    kisiler, bilinenMahalleler, bilinenPlakalar, sayiOnek: ayar.sayiOnek || '',
-    amirler: [ayar.subeMuduruAd, ayar.ilMudYrdAd, ...(ayar.ocrHaricAdlar || [])].filter(a => a && a !== 'Ad SOYAD')
+    kisiler, bilinenMahalleler, bilinenPlakalar,
+    amirler: (ayar.ocrHaricAdlar || []).filter(Boolean)
   };
 }
 
@@ -113,21 +171,26 @@ async function gorselGetir(g) {
 }
 
 // OCR sonucunu kayda işle.
-// Eşleşme: önce sayı (her görev emrine özgü), yoksa aynı tarihli ve görüntüsü olmayan kayıt. Örnek kayıtlar eşleşmez.
-// Kontrol edilmemiş kayıtta yeni OCR sonucu öncekinin üzerine yazılır; kontrol edilmiş kayıtta yalnızca boş alanlar doldurulur.
+// Eşleşme sırası: belge no (+ tarih), görev emri sayısı (OCR'ın arka planda okuduğu), aynı tarihli ve görüntüsü olmayan kayıt.
+// Örnek kayıtlar eşleşmez. Kontrol edilmemiş kayıtta yeni OCR sonucu öncekinin üzerine yazılır;
+// kontrol edilmiş kayıtta yalnızca boş alanlar doldurulur.
 const OCR_ALANLARI = ['tarih', 'sayi', 'belgeNo', 'yerHam', 'yer', 'plaka', 'surucu', 'personel', 'cikis', 'donus'];
 const dolu = (v) => Array.isArray(v) ? v.length > 0 : !!v;
 
 async function kaydaIsle(okunan, gorselAlanlari) {
-  // Örnek kayıtlar hariç. Bu sürümden önce içe aktarılan örnekler işaretsiz olabilir; uydurma sayı önekinden tanınır.
-  // Not: koşullar $and ile birleştirilir; aynı alanı (sayi) iki kez yazmak birini ezer.
+  await adlariDuzenle(okunan, okunan.kisiUnvanlari || {});
+  delete okunan.kisiUnvanlari;
+  // Not: koşullar $and ile birleştirilir; aynı alanı iki kez yazmak birini ezer.
   const gercek = [{ ornek: { $ne: true } }, { sayi: { $not: /^E-00000000-/ } }];
+  const belgeNo = /^\d{6}$/.test(okunan.belgeNo || '') ? okunan.belgeNo : '';
   let kayit = null;
-  if (okunan.sayi) kayit = await Gorev.findOne({ $and: [{ sayi: okunan.sayi }, ...gercek] });
+  if (belgeNo) kayit = await Gorev.findOne({ $and: [{ belgeNo }, ...(okunan.tarih ? [{ tarih: okunan.tarih }] : []), ...gercek] });
+  if (!kayit && okunan.sayi) kayit = await Gorev.findOne({ $and: [{ sayi: okunan.sayi }, ...gercek] });
   if (!kayit && okunan.tarih) {
     kayit = await Gorev.findOne({ $and: [
       { tarih: okunan.tarih }, { dosya: { $in: [null, ''] } }, { driveId: { $in: [null, ''] } },
-      // Başka bir görev emrinin sayısını taşıyan kayıt aynı tarihte olsa da eşleşmez
+      // Başka bir görev emrinin belge no'sunu ya da sayısını taşıyan kayıt aynı tarihte olsa da eşleşmez
+      ...(belgeNo ? [{ belgeNo: { $in: [null, '', belgeNo] } }] : []),
       ...(okunan.sayi ? [{ sayi: { $in: [null, '', okunan.sayi] } }] : []),
       ...gercek
     ] });
@@ -155,14 +218,12 @@ app.get('/api/gorevler', hata(async (req, res) => {
 app.get('/api/gorevler/:id', hata(async (req, res) => res.json(await Gorev.findById(req.params.id).lean())));
 
 app.post('/api/gorevler', hata(async (req, res) => {
-  const kayit = await Gorev.create(gorevTemizle(req.body));
-  await kisileriKaydet(kayit);
+  const kayit = await Gorev.create(await adlariDuzenle(gorevTemizle(req.body)));
   res.json(kayit);
 }));
 
 app.put('/api/gorevler/:id', hata(async (req, res) => {
-  const kayit = await Gorev.findByIdAndUpdate(req.params.id, gorevTemizle(req.body), { new: true });
-  await kisileriKaydet(kayit);
+  const kayit = await Gorev.findByIdAndUpdate(req.params.id, await adlariDuzenle(gorevTemizle(req.body)), { new: true });
   res.json(kayit);
 }));
 
@@ -220,7 +281,7 @@ app.post('/api/ocr/tam', yukle.single('dosya'), hata(async (req, res) => {
 
 app.get('/api/oneriler', hata(async (req, res) => {
   const [plakalar, suruculer, kisiler] = await Promise.all([Gorev.distinct('plaka'), Gorev.distinct('surucu'), Kisi.find().sort({ ad: 1 }).lean()]);
-  res.json({ plakalar: plakalar.filter(Boolean).sort(), suruculer: suruculer.filter(Boolean).sort(), kisiler: kisiler.map(k => k.ad) });
+  res.json({ plakalar: plakalar.filter(Boolean).sort(), suruculer: suruculer.filter(Boolean).sort(), kisiler: kisiler.map(k => ({ ad: k.ad, unvan: k.unvan || '' })) });
 }));
 
 // ---------- Google Drive ----------
@@ -311,11 +372,23 @@ app.put('/api/ayarlar', hata(async (req, res) => {
 }));
 app.get('/api/kisiler', hata(async (req, res) => res.json(await Kisi.find().sort({ ad: 1 }).lean())));
 app.put('/api/kisiler', hata(async (req, res) => {
-  const liste = (req.body || []).filter(k => k.ad?.trim()).map(k => ({
-    ad: k.ad.trim(), unvan: (k.unvan || '').trim(), unvanCetvel: (k.unvanCetvel || '').trim(), unvanSeyyar: (k.unvanSeyyar || '').trim()
-  }));
+  // Aynı kişinin farklı yazımları tek kayda iner; ada yazılmış ünvan ayrılır
+  const harita = new Map();
+  for (const k of req.body || []) {
+    if (!k.ad?.trim()) continue;
+    const { ad, unvan } = adUnvanAyir(k.ad.trim());
+    const temiz = adBicim(ad);
+    if (!temiz) continue;
+    const anahtar = sade(temiz);
+    const onceki = harita.get(anahtar) || {};
+    harita.set(anahtar, {
+      ad: onceki.ad || temiz,
+      unvan: onceki.unvan || (k.unvan || '').trim() || unvan,
+      unvanCetvel: onceki.unvanCetvel || (k.unvanCetvel || '').trim()
+    });
+  }
   await Kisi.deleteMany({});
-  await Kisi.insertMany(liste, { ordered: false }).catch(() => {});
+  await Kisi.insertMany([...harita.values()], { ordered: false }).catch(() => {});
   res.json(await Kisi.find().sort({ ad: 1 }).lean());
 }));
 
@@ -344,17 +417,16 @@ function secenekler(q) {
   };
 }
 
-// Seçilen kişinin adı ve ünvanlarıyla ayarları birleştir. Kişi seçilmemişse Ayarlar'daki varsayılan personel.
+// Seçilen kişinin adı ve ünvanlarıyla ayarları birleştir. "*" yalnızca görev listesi için (tüm kişiler).
 async function kisiAyari(ayar, ad) {
-  if (!ad || ad === '*' || ad === ayar.personelAd) {
-    const k = await Kisi.findOne({ ad: ayar.personelAd }).lean();
-    return k?.unvanCetvel || k?.unvanSeyyar ? { ...ayar, personelUnvanCetvel: k.unvanCetvel || ayar.personelUnvanCetvel, personelUnvanSeyyar: k.unvanSeyyar || ayar.personelUnvanSeyyar } : ayar;
-  }
+  const temel = { ...ayar, subeMuduruAd: '', ilMudYrdAd: '' }; // imzalar EDYS'de atanır; Excel'de ad satırı boş kalır
+  if (ad === '*') return { ...temel, personelAd: '', personelUnvan: '', personelUnvanCetvel: '', personelUnvanSeyyar: '' };
+  if (!ad) throw new Error('Personel seçiniz.');
   const k = await Kisi.findOne({ ad }).lean();
   if (!k) throw new Error(`Kişi bulunamadı: ${ad}`);
-  const unvan = k.unvan || '';
-  const cetvel = k.unvanCetvel || unvan;
-  return { ...ayar, personelAd: k.ad, personelUnvan: unvan, personelUnvanCetvel: cetvel, personelUnvanSeyyar: k.unvanSeyyar || cetvel };
+  const gorev = k.unvan || '';
+  const unvan = k.unvanCetvel || k.unvanSeyyar || gorev;
+  return { ...temel, personelAd: k.ad, personelUnvan: gorev, personelUnvanCetvel: unvan, personelUnvanSeyyar: unvan };
 }
 
 async function icmalHazirla(req) {

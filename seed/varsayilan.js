@@ -51,7 +51,7 @@ const kisiler = [
   ['Zeynep ŞAHİN', 'Mühendis', ...ZM], ['Can ÖZTÜRK', 'Mühendis', ...ZM], ['Elif AYDIN', 'Mühendis', ...ZM],
   ['Murat ÇELİK', 'Mühendis', ...ZM], ['Selin ARSLAN', 'İşçi', 'Sürekli İşçi', 'Sürekli İşçi'],
   ['Hakan KOÇ', 'Şoför', 'Şoför', 'Şoför'], ['Emre KURT', 'Şoför', 'Şoför', 'Şoför']
-].map(([ad, unvan, unvanCetvel, unvanSeyyar]) => ({ ad, unvan, unvanCetvel, unvanSeyyar }));
+].map(([ad, unvan, , unvanSeyyar]) => ({ ad, unvan, unvanCetvel: unvanSeyyar }));
 
 // Uydurma örnek görev emirleri (gerçek kişi, plaka ve evrakla ilgisi yoktur).
 // Ayarlar ekranındaki "Örnek veriyi içe aktar" düğmesiyle yüklenir.

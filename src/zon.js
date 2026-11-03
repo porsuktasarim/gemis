@@ -248,7 +248,7 @@ async function bolgeselOku(girdi) {
   const gorevin = bul(/^gorevin/)[0];
   if (pBaslik) {
     okumalar.push((async () => {
-      const ad = [];
+      const ad = [], unvan = [];
       const bh = hucre(c, g.W, g.H, ...merkez(pBaslik));
       const x = bh.x0 + 40;
       let y = bh.y1 + 6;
@@ -260,10 +260,15 @@ async function bolgeselOku(girdi) {
         const t = await hucreOku(g, k);
         if (/gidece|g[öo]revin|onaylayan|t[üu]r[üu]\b|ara[çc]in/i.test(t)) break; // personel bölümü bitti
         const ad_ = adTemizle(t);
-        if (ad_) { ad.push(ad_); bos = 0; } else if (++bos >= 2) break;
+        if (ad_) {
+          ad.push(ad_); bos = 0;
+          // Ünvan sütunu (adın sağındaki hücre); hücre çizgileri bulunamadıysa ünvan zaten ad metnine karışmıştır
+          const sag = k.x1 < g.W * 0.45 ? hucre(c, g.W, g.H, k.x1 + 20, (k.y0 + k.y1) / 2) : null;
+          unvan.push(sag && hucreMakul(sag, g.W, g.H) ? await hucreOku(g, sag) : '');
+        } else if (++bos >= 2) break;
         y = k.y1 + 6;
       }
-      sonuc.personel = ad;
+      sonuc.personel = ad; sonuc.personelUnvan = unvan;
     })());
   }
 
