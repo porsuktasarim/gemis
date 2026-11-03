@@ -5,6 +5,15 @@ const api = async (url, opt = {}) => {
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.hata || r.statusText); }
   return r.json();
 };
+// Beklenmeyen arayüz hatalarını sayfanın üstünde göster (sessizce boş ekran kalmasın)
+function arayuzHatasi(mesaj) {
+  const el = document.getElementById('sistemUyari');
+  if (!el) return;
+  el.innerHTML = `<i class="bi bi-bug me-1"></i> Arayüz hatası: ${String(mesaj).replace(/[<>&]/g, '')}. Sayfayı yenileyiniz (Ctrl+F5); sürerse bu mesajı bildiriniz.`;
+  el.hidden = false;
+}
+window.addEventListener('error', (e) => arayuzHatasi(e.message));
+window.addEventListener('unhandledrejection', (e) => arayuzHatasi(e.reason?.message || e.reason));
 const tarihTR = (iso) => iso ? iso.split('-').reverse().join('.') : '';
 const tarihISO = (tr) => { const m = /(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(tr || ''); return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : ''; };
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -51,28 +60,47 @@ async function onerileriYukle() {
 $('#gorevAy').value = gecenAy;
 $('#gorevAy').addEventListener('change', gorevleriYukle);
 
+// Element bulunamasa bile hata vermeyen yazım (sayfa ile script sürümü uyuşmasa da liste çizilsin)
+const yaz = (sel, v) => { const el = $(sel); if (el) el.textContent = v; };
+
 async function gorevleriYukle() {
-  const liste = await api(`/api/gorevler?ay=${$('#gorevAy').value}`);
-  const eksikMi = (g) => !g.yer?.length || !g.plaka || !g.surucu || !g.cikis || !g.donus;
-  $('#ozToplam').textContent = liste.length;
-  $('#ozBekleyen').textContent = liste.filter(g => !g.onayli).length;
-  $('#ozBelgeNo').textContent = liste.filter(g => !/^\d{6}$/.test(g.belgeNo || '')).length;
-  $('#ozEksik').textContent = liste.filter(eksikMi).length;
+  const tumu = $('#gorevTumu')?.checked;
+  let liste;
+  try { liste = await api(`/api/gorevler?ay=${tumu ? 'tum' : $('#gorevAy').value}`); }
+  catch (e) {
+    $('#gorevTablo').innerHTML = `<tr><td colspan="10" class="text-danger text-center py-4">Görev emirleri alınamadı: ${esc(e.message)}</td></tr>`;
+    return;
+  }
   const bos = '<span class="eksik">—</span>';
-  $('#gorevTablo').innerHTML = liste.length ? liste.map(g => `
+  const satir = (g) => {
+    try {
+      return `
     <tr data-id="${g._id}">
-      <td class="text-nowrap ps-3">${tarihTR(g.tarih) || bos}</td>
-      <td>${esc(yerYaz(g.yer)) || bos}</td>
+      <td class="text-nowrap ps-3">${g.tarih ? tarihTR(String(g.tarih)) : '<span class="badge text-bg-danger">Tarih yok</span>'}</td>
+      <td>${esc(yerYaz(g.yer)) || esc(g.yerHam) || bos}</td>
       <td>${esc(g.surucu) || bos}</td>
       <td class="text-nowrap">${esc(g.plaka) || bos}</td>
-      <td>${g.cikis || bos}</td><td>${g.donus || bos}</td>
+      <td>${esc(g.cikis) || bos}</td><td>${esc(g.donus) || bos}</td>
       <td>${esc(g.belgeNo) || bos}</td>
-      <td class="small">${esc((g.personel || []).join(', '))}</td>
+      <td class="small">${esc((Array.isArray(g.personel) ? g.personel : []).join(', '))}</td>
       <td>${g.ornek ? '<span class="badge text-bg-secondary">Örnek</span> ' : ''}${g.onayli ? '<span class="badge text-bg-success">Kontrol edildi</span>' : '<span class="badge text-bg-warning">Kontrol bekliyor</span>'}
           ${g.driveId ? '<i class="bi bi-google text-muted" title="Görüntü Drive\'da"></i>' : g.dosya ? '<i class="bi bi-image text-muted" title="Görüntü sunucuda"></i>' : '<i class="bi bi-image text-danger" title="Görüntü yok"></i>'}</td>
       <td><button class="btn btn-sm btn-link p-0"><i class="bi bi-pencil"></i></button></td>
-    </tr>`).join('') : '<tr><td colspan="10" class="text-muted text-center py-4">Bu ay için görev emri yok. JPEG yükleyebilir ya da elle ekleyebilirsiniz.</td></tr>';
+    </tr>`;
+    } catch (e) {
+      return `<tr data-id="${g._id}"><td colspan="10" class="text-danger">Bu kayıt gösterilemedi (${esc(e.message)}); açıp düzeltebilirsiniz.</td></tr>`;
+    }
+  };
+  // Önce tablo, sonra özet kutuları
+  $('#gorevTablo').innerHTML = liste.length ? liste.map(satir).join('')
+    : `<tr><td colspan="10" class="text-muted text-center py-4">${tumu ? 'Hiç görev emri yok.' : 'Bu ay için görev emri yok. JPEG yükleyebilir, elle ekleyebilir ya da "Tüm aylar"ı açabilirsiniz.'}</td></tr>`;
+  const eksikMi = (g) => !g.yer?.length || !g.plaka || !g.surucu || !g.cikis || !g.donus;
+  yaz('#ozToplam', liste.length);
+  yaz('#ozBekleyen', liste.filter(g => !g.onayli).length);
+  yaz('#ozBelgeNo', liste.filter(g => !/^\d{6}$/.test(g.belgeNo || '')).length);
+  yaz('#ozEksik', liste.filter(eksikMi).length);
 }
+$('#gorevTumu')?.addEventListener('change', gorevleriYukle);
 $('#gorevTablo').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) gorevAc(tr.dataset.id); });
 
 // ---------- Yükleme ----------
@@ -96,6 +124,9 @@ $('#dosyaSec').addEventListener('change', async (e) => {
   e.target.value = '';
   $('#yukleDurum').innerHTML = sonuc.map(s => `${esc(s.dosya)}: ${esc(s.durum)}${s.tarih ? ` (${tarihTR(s.tarih)})` : ''}`).join('<br>');
   const ilk = sonuc.find(s => s.tarih); if (ilk) $('#gorevAy').value = ilk.tarih.slice(0, 7);
+  // Farklı aylara düşen kayıt varsa hepsini göster
+  const aylar_ = new Set(sonuc.filter(s => s.tarih).map(s => s.tarih.slice(0, 7)));
+  if (aylar_.size > 1 && $('#gorevTumu')) $('#gorevTumu').checked = true;
   await gorevleriYukle(); onerileriYukle();
 });
 
@@ -483,4 +514,8 @@ $('#driveTara').addEventListener('click', async () => {
 api('/api/sistem').then(d => {
   if (d.hata) { $('#sistemUyari').innerHTML = `<i class="bi bi-exclamation-octagon me-1"></i> ${esc(d.hata)} Docker imajını yeniden derleyiniz: <code>docker compose up -d --build</code>`; $('#sistemUyari').hidden = false; }
 }).catch(() => {});
-gorevleriYukle(); kisiSecimiYukle(); onerileriYukle(); driveDurumYukle();
+// Açılış: seçili ayda kayıt yoksa kayıt bulunan en son aya geç
+api('/api/gorevler-aylar').then(({ aylar }) => {
+  if (aylar.length && !aylar.some(a => a.ay === $('#gorevAy').value)) $('#gorevAy').value = aylar[0].ay;
+}).catch(() => {}).finally(gorevleriYukle);
+kisiSecimiYukle(); onerileriYukle(); driveDurumYukle();

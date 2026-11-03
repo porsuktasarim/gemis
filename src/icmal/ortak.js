@@ -58,20 +58,21 @@ const imzaHtml = (yil) => IMZA_HTML.replace('/2026</span>', `/${yil}</span>`);
 function mahalliDisiMi(ayar, ilce, mahalle) {
   const k = (ayar.mahalliDisi || []).find(x => sade(x.ilce) === sade(ilce));
   if (!k) return false;
-  return k.mahalleler.some(m => sade(m) === sade(mahalle) || benzer(m, mahalle, 0.15));
+  return (k.mahalleler || []).some(m => sade(m) === sade(mahalle) || benzer(m, mahalle, 0.15));
 }
 
 // Yer biçimleri
+const mah = (g) => (Array.isArray(g?.mahalleler) ? g.mahalleler : []);
 const yerEkOzel = (yer) => ({
-  ilce: yer.map(g => trUpper(g.ilce)).join('-'),
-  mahalle: yer.map(g => g.mahalleler.length ? g.mahalleler.map(trUpper).join(',') : 'MERKEZ').join('-')
+  ilce: (yer || []).map(g => trUpper(g.ilce)).join('-'),
+  mahalle: (yer || []).map(g => mah(g).length ? mah(g).map(trUpper).join(',') : 'MERKEZ').join('-')
 });
 const yerVirgullu = (yer) => ({
-  ilce: yer.map(g => g.ilce).join(', '),
-  mahalle: yer.map(g => g.mahalleler.length ? g.mahalleler.join('-') : 'Merkez').join(', ')
+  ilce: (yer || []).map(g => g.ilce).join(', '),
+  mahalle: (yer || []).map(g => mah(g).length ? mah(g).join('-') : 'Merkez').join(', ')
 });
 function yerSeyyar(ayar, yer) {
-  return yer.map(g => ({ ilce: g.ilce, mahalleler: g.mahalleler.filter(m => mahalliDisiMi(ayar, g.ilce, m)) }))
+  return (yer || []).map(g => ({ ilce: g.ilce, mahalleler: mah(g).filter(m => mahalliDisiMi(ayar, g.ilce, m)) }))
     .filter(g => g.mahalleler.length);
 }
 

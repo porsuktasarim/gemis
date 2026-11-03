@@ -15,6 +15,7 @@ const drive = require('./drive');
 const elyazisi = require('./elyazisi');
 const { kanonikAd, adUnvanAyir, adBicim, unvanBul } = require('./kisiler');
 const { sade } = require('./util');
+const { gorevDuzelt, gorevleriOnar } = require('./duzelt');
 const varsayilan = require('../seed/varsayilan');
 
 const PORT = process.env.PORT || 1138;
@@ -22,9 +23,16 @@ const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017/gemis';
 // Yalnızca "Görüntüleri sunucuda sakla" seçeneği açıkken kullanılır.
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'data', 'uploads');
 
+const SURUM = require('../package.json').version;
 const app = express();
 app.use(express.json({ limit: '5mb' }));
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// Sayfa her açılışta yeniden istenir ve script/stil adresleri sürüm taşır: güncellemeden sonra
+// tarayıcıda eski dosya kalmaz
+const PUBLIC = path.join(__dirname, '..', 'public');
+const sayfa = () => fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8')
+  .replace(/(src|href)="\/(app\.js|style\.css)"/g, `$1="/$2?v=${SURUM}"`).replace(/__SURUM__/g, SURUM);
+app.get(['/', '/index.html'], (req, res) => { res.setHeader('Cache-Control', 'no-cache'); res.type('html').send(sayfa()); });
+app.use(express.static(PUBLIC, { index: false, setHeaders: (res, p) => { if (/\.(js|css|html)$/.test(p)) res.setHeader('Cache-Control', 'no-cache'); } }));
 app.use('/vendor/bootstrap', express.static(path.join(__dirname, '..', 'node_modules', 'bootstrap', 'dist')));
 app.use('/vendor/adminlte', express.static(path.join(__dirname, '..', 'node_modules', 'admin-lte', 'dist')));
 app.use('/vendor/overlayscrollbars', express.static(path.join(__dirname, '..', 'node_modules', 'overlayscrollbars')));
@@ -56,6 +64,7 @@ async function ayarGetir() {
 async function ilkKurulum() {
   await ayarGetir();
   if (!(await Kisi.countDocuments())) await Kisi.insertMany(varsayilan.kisiler);
+  await gorevleriOnar(Gorev);
   await kisilerToparla();
 }
 
@@ -85,13 +94,24 @@ async function kisilerToparla() {
     await Kisi.deleteMany({ _id: { $in: grup.map(x => x._id) } });
     await Kisi.create({ ad, unvan, unvanCetvel });
   }
-  if (!donusum.size) return;
-  for (const g of await Gorev.find({ $or: [{ surucu: { $in: [...donusum.keys()] } }, { personel: { $in: [...donusum.keys()] } }] })) {
-    if (donusum.has(g.surucu)) g.surucu = donusum.get(g.surucu);
-    g.personel = [...new Set((g.personel || []).map(a => donusum.get(a) || a))];
-    await g.save();
+  // Görev kayıtlarındaki adlar: kayıtlı kişiye bağlanabilenler kayıtlı yazıma çevrilir ("Uğur TÜRKELİ İMÜHENDİS" → "Uğur TÜRKELİ")
+  const kisiler = await Kisi.find().lean();
+  const cevir = (a) => {
+    if (typeof a !== 'string' || !a.trim()) return a;
+    if (donusum.has(a)) return donusum.get(a);
+    const r = kanonikAd(a, kisiler);
+    return r.kayitli ? r.ad : a;
+  };
+  let duzelen = 0;
+  for (const g of await Gorev.find({}, { personel: 1, surucu: 1 }).lean()) {
+    const personel = Array.isArray(g.personel) ? [...new Set(g.personel.map(cevir).filter(Boolean))] : g.personel;
+    const surucu = cevir(g.surucu);
+    if (JSON.stringify(personel) !== JSON.stringify(g.personel) || surucu !== g.surucu) {
+      await Gorev.updateOne({ _id: g._id }, { $set: { personel, surucu } });
+      duzelen++;
+    }
   }
-  console.log(`Kişiler toparlandı: ${donusum.size} farklı yazım birleştirildi.`);
+  if (donusum.size || duzelen) console.log(`Kişiler toparlandı: ${donusum.size} farklı yazım birleştirildi, ${duzelen} görev kaydındaki adlar düzeltildi.`);
 }
 
 // Görev verisini temizle (formdan ya da OCR'dan gelen)
@@ -138,8 +158,9 @@ async function ocrBaglami() {
   const kisiler = await Kisi.find().lean();
   const bilinenMahalleler = {};
   for (const m of ayar.mahalliDisi || []) bilinenMahalleler[m.ilce] = [...m.mahalleler];
-  for (const g of await Gorev.find({}, { yer: 1 }).lean()) {
-    for (const y of g.yer || []) {
+  for (const g0 of await Gorev.find({}, { yer: 1 }).lean()) {
+    const g = gorevDuzelt(g0);
+    for (const y of g.yer) {
       bilinenMahalleler[y.ilce] = bilinenMahalleler[y.ilce] || [];
       for (const m of y.mahalleler) if (!bilinenMahalleler[y.ilce].includes(m)) bilinenMahalleler[y.ilce].push(m);
     }
@@ -209,13 +230,31 @@ async function kaydaIsle(okunan, gorselAlanlari) {
 }
 
 // ---------- Görevler ----------
+// ay=YYYY-MM: o ayın kayıtları + tarihi okunamamış kayıtlar (hiçbir ayda kaybolmasınlar); ay=tum: hepsi
 app.get('/api/gorevler', hata(async (req, res) => {
-  const q = {};
-  if (req.query.ay) q.tarih = { $regex: `^${req.query.ay}` };
-  res.json(await Gorev.find(q, { ocrMetin: 0 }).sort({ tarih: 1 }).lean());
+  const ay = String(req.query.ay || '');
+  let q = {};
+  if (/^\d{4}-\d{2}$/.test(ay)) q = { $or: [{ tarih: { $regex: `^${ay}` } }, { tarih: { $in: [null, ''] } }, { tarih: { $exists: false } }] };
+  const liste = (await Gorev.find(q, { ocrMetin: 0 }).lean()).map(gorevDuzelt);
+  // Tarihsizler en üstte, sonra tarihe göre
+  liste.sort((a, b) => (a.tarih ? 1 : 0) - (b.tarih ? 1 : 0) || String(a.tarih).localeCompare(String(b.tarih)));
+  res.json(liste);
 }));
 
-app.get('/api/gorevler/:id', hata(async (req, res) => res.json(await Gorev.findById(req.params.id).lean())));
+// Kayıt bulunan aylar ve sayıları (en yeniden eskiye); tarihsiz kayıt sayısı ayrıca
+app.get('/api/gorevler-aylar', hata(async (req, res) => {
+  const r = await Gorev.aggregate([{ $group: { _id: { $substrCP: [{ $ifNull: ['$tarih', ''] }, 0, 7] }, sayi: { $sum: 1 } } }]);
+  const aylar = r.filter(x => /^\d{4}-\d{2}$/.test(x._id)).map(x => ({ ay: x._id, sayi: x.sayi })).sort((a, b) => b.ay.localeCompare(a.ay));
+  res.json({ aylar, tarihsiz: r.filter(x => !/^\d{4}-\d{2}$/.test(x._id)).reduce((t, x) => t + x.sayi, 0) });
+}));
+
+app.get('/api/surum', (req, res) => res.json({ surum: SURUM }));
+
+app.get('/api/gorevler/:id', hata(async (req, res) => {
+  const g = await Gorev.findById(req.params.id).lean();
+  if (!g) return res.status(404).json({ hata: 'Kayıt bulunamadı' });
+  res.json({ ...gorevDuzelt(g), ocrMetin: g.ocrMetin || '' });
+}));
 
 app.post('/api/gorevler', hata(async (req, res) => {
   const kayit = await Gorev.create(await adlariDuzenle(gorevTemizle(req.body)));
@@ -432,7 +471,7 @@ async function kisiAyari(ayar, ad) {
 async function icmalHazirla(req) {
   const sec = secenekler(req.query);
   const ayar = await kisiAyari(await ayarGetir(), sec.kisi);
-  const gorevler = await Gorev.find({}, { ocrMetin: 0 }).lean();
+  const gorevler = (await Gorev.find({}, { ocrMetin: 0 }).lean()).map(gorevDuzelt);
   return { ayar, icmal: icmalUret(req.params.tur, ayar, gorevler, sec) };
 }
 const dosyaAdi = (s) => s.replace(/[^\wçğıöşüÇĞİÖŞÜ -]/g, '').replace(/\s+/g, '_');
