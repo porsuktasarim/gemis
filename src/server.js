@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const { Gorev, Kisi, Ayar, Plaka } = require('./models');
 const { VARSAYILAN: SABLON_VARSAYILAN, ESKI_SAYI, imzaCoz } = require('./icmal/sablon');
 const { gorevOku } = require('./ocr');
+const { raporSayfasi, raporTani, siraNo } = require('./rapor');
 const { secimOku } = require('./secimOku');
 const { icmalUret, TURLER } = require('./icmal');
 const { excelUret, pdfUret } = require('./disaktar');
@@ -160,7 +161,8 @@ function gorevTemizle(b) {
   if (g.cikis !== undefined) g.cikis = saatNormal(g.cikis);
   if (g.donus !== undefined) g.donus = saatNormal(g.donus);
   if (Array.isArray(g.personel)) g.personel = [...new Set(g.personel.map(s => s.trim()).filter(Boolean))];
-  for (const k of ['_id', 'dosya', 'driveId', 'driveAd', 'ocrMetin', 'okunanUnvanlar', 'createdAt', 'updatedAt']) delete g[k];
+  for (const k of ['_id', 'dosya', 'driveId', 'driveAd', 'ocrMetin', 'okunanUnvanlar', 'createdAt', 'updatedAt', 'raporDosya', 'raporDriveId', 'raporDriveAd', 'raporYuklendi']) delete g[k];
+  for (const k of ['raporMetni', 'raporIsletme']) if (typeof g[k] === 'string') g[k] = g[k].trim();
   return g;
 }
 
@@ -239,6 +241,34 @@ async function gorselGetir(g) {
   }
   if (g.driveId) return drive.indir(g.driveId);
   return null;
+}
+
+const raporVar = (g) => !!(g?.raporDosya || g?.raporDriveId);
+async function raporGorseliGetir(g) {
+  if (g.raporDosya) {
+    try { return await fs.promises.readFile(path.join(UPLOAD_DIR, g.raporDosya)); } catch { /* Drive'a düş */ }
+  }
+  if (g.raporDriveId) return drive.indir(g.raporDriveId);
+  return null;
+}
+
+// Taranmış görev sonu raporunu göreve bağlar: önce belge no + çıkış tarihi, sonra yalnızca belge no.
+// Eşleşen görev yoksa yeni görev açılmaz (rapor görev emri değildir).
+// kaydet(): görüntü saklama açıksa yerel kopyayı yazar; yalnızca eşleşme olursa çağrılır.
+async function raporBagla(r, { driveId, driveAd, kaydet }) {
+  const gercek = [{ ornek: { $ne: true } }];
+  let kayit = null;
+  if (r.belgeNo && r.tarih) kayit = await Gorev.findOne({ $and: [{ belgeNo: r.belgeNo }, { tarih: r.tarih }, ...gercek] });
+  if (!kayit && r.belgeNo) kayit = await Gorev.findOne({ $and: [{ belgeNo: r.belgeNo }, ...gercek] });
+  if (!kayit) return { kayit: null, durum: `görev sonu raporu: ${r.belgeNo ? `${siraNo(r.belgeNo)} sıra numaralı görev bulunamadı` : 'sıra numarası okunamadı'}, bağlanmadı` };
+  const yeniden = !!kayit.raporYuklendi;
+  if (kayit.raporDosya) fs.unlink(path.join(UPLOAD_DIR, kayit.raporDosya), () => {});
+  kayit.raporDosya = kaydet ? kaydet() : undefined;
+  kayit.raporDriveId = driveId || undefined;
+  kayit.raporDriveAd = driveAd || undefined;
+  if (!kayit.raporYuklendi) kayit.raporYuklendi = new Date();
+  await kayit.save();
+  return { kayit, durum: `görev sonu raporu ${siraNo(kayit.belgeNo)} sıra numaralı göreve ${yeniden ? 'yeniden ' : ''}bağlandı` };
 }
 
 // OCR sonucunu kayda işle.
@@ -324,6 +354,7 @@ app.put('/api/gorevler/:id', hata(async (req, res) => {
 app.delete('/api/gorevler/:id', hata(async (req, res) => {
   const g = await Gorev.findByIdAndDelete(req.params.id);
   if (g?.dosya) fs.unlink(path.join(UPLOAD_DIR, g.dosya), () => {});
+  if (g?.raporDosya) fs.unlink(path.join(UPLOAD_DIR, g.raporDosya), () => {});
   res.json({ ok: true });
 }));
 
@@ -336,6 +367,47 @@ app.get('/api/gorevler/:id/gorsel', hata(async (req, res) => {
   res.send(buf);
 }));
 
+app.get('/api/gorevler/:id/rapor-gorsel', hata(async (req, res) => {
+  const g = await Gorev.findById(req.params.id).lean();
+  const buf = g && await raporGorseliGetir(g);
+  if (!buf) return res.status(404).end();
+  res.setHeader('Content-Type', buf[0] === 0x89 ? 'image/png' : 'image/jpeg');
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.send(buf);
+}));
+
+// Taranmış raporun bağlantısını kaldırır (Drive'daki dosyaya dokunulmaz; tekrar taramada yeniden bağlanabilir)
+app.delete('/api/gorevler/:id/rapor', hata(async (req, res) => {
+  const g = await Gorev.findById(req.params.id);
+  if (!g) return res.status(404).json({ hata: 'Kayıt bulunamadı' });
+  if (g.raporDosya) fs.unlink(path.join(UPLOAD_DIR, g.raporDosya), () => {});
+  g.raporDosya = undefined; g.raporDriveId = undefined; g.raporDriveAd = undefined; g.raporYuklendi = undefined;
+  await g.save();
+  res.json({ ok: true });
+}));
+
+// Görevlendirme ve görev sonu raporu (yazdırma sayfası).
+// ?id=…&id=… seçilen görevler; ?ay=YYYY-MM[&kisi=Ad SOYAD] o ayın görevleri; ?raporTarihi=YYYY-MM-DD (boşsa bugün)
+app.get('/rapor', hata(async (req, res) => {
+  const ayar = await ayarGetir();
+  const idler = [].concat(req.query.id || []).flatMap(x => String(x).split(',')).filter(x => /^[a-f0-9]{24}$/i.test(x));
+  let gorevler = [];
+  if (idler.length) {
+    const hepsi = (await Gorev.find({ _id: { $in: idler } }, { ocrMetin: 0 }).lean()).map(gorevDuzelt);
+    gorevler = idler.map(id => hepsi.find(g => String(g._id) === id)).filter(Boolean);
+  } else if (/^\d{4}-\d{2}$/.test(String(req.query.ay || ''))) {
+    gorevler = (await Gorev.find({ tarih: { $regex: `^${req.query.ay}` } }, { ocrMetin: 0 }).lean()).map(gorevDuzelt);
+    const kisi = sade(String(req.query.kisi || ''));
+    if (kisi) gorevler = gorevler.filter(g => (g.personel || []).some(p => sade(p) === kisi));
+    gorevler.sort((a, b) => a.tarih.localeCompare(b.tarih) || String(a.belgeNo).localeCompare(String(b.belgeNo)));
+  }
+  const bugun = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const raporTarihi = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.raporTarihi || '')) ? req.query.raporTarihi : bugun;
+  const [kisiler, plakalar] = await Promise.all([Kisi.find().lean(), Plaka.find().lean()]);
+  res.setHeader('Cache-Control', 'no-cache');
+  res.type('html').send(raporSayfasi(gorevler, ayar, { kisiler, plakalar, raporTarihi }));
+}));
+
 // Elle yükleme + OCR. Görüntü bellekte işlenir; yalnızca saklama seçeneği açıksa diske yazılır.
 app.post('/api/gorevler/yukle', yukle.array('dosyalar', 60), hata(async (req, res) => {
   if (!req.files?.length) return res.status(400).json({ hata: 'Dosya alınamadı. Yalnızca JPEG ve PNG görüntüler okunabilir.' });
@@ -345,6 +417,12 @@ app.post('/api/gorevler/yukle', yukle.array('dosyalar', 60), hata(async (req, re
   for (const f of req.files) {
     const ad = Buffer.from(f.originalname, 'latin1').toString('utf8');
     const okunan = await gorevOku(f.buffer, ad, baglam);
+    const r = raporTani(okunan.ocrMetin);
+    if (r) {
+      const { kayit, durum } = await raporBagla(r, { kaydet: ayar.gorselSakla ? () => yerelKaydet(f.buffer, ad) : null });
+      sonuc.push({ id: kayit?._id, dosya: ad, durum, tarih: kayit?.tarih, rapor: true });
+      continue;
+    }
     const alanlar = ayar.gorselSakla ? { dosya: yerelKaydet(f.buffer, ad) } : {};
     const { kayit, durum } = await kaydaIsle(okunan, alanlar);
     sonuc.push({ id: kayit._id, dosya: ad, durum: ayar.gorselSakla ? durum : `${durum}, görüntü saklanmadı`, tarih: kayit.tarih });
@@ -394,7 +472,7 @@ async function driveTara() {
   try {
     const dosyalar = await drive.gorselleriBul(kok);
     ozet.bulunan = dosyalar.length;
-    const islenmis = new Set((await Gorev.distinct('driveId')).filter(Boolean));
+    const islenmis = new Set([...(await Gorev.distinct('driveId')), ...(await Gorev.distinct('raporDriveId'))].filter(Boolean));
     const baglam = await ocrBaglami();
     const yeniler = dosyalar.filter(x => !islenmis.has(x.id));
     taramaDurumu.toplam = yeniler.length;
@@ -404,6 +482,13 @@ async function driveTara() {
         const buf = await drive.indir(f.id);
         const ad = f.yol ? `${f.yol}/${f.name}` : f.name;
         const okunan = await gorevOku(buf, f.name, baglam);
+        const r = raporTani(okunan.ocrMetin);
+        if (r) {
+          const { kayit, durum } = await raporBagla(r, { driveId: f.id, driveAd: ad, kaydet: ayar.gorselSakla ? () => yerelKaydet(buf, f.name) : null });
+          if (kayit) ozet.rapor = (ozet.rapor || 0) + 1; else ozet.hata.push(`${ad}: ${durum}`);
+          ozet.kayitlar.push({ id: kayit?._id, dosya: ad, durum, tarih: kayit?.tarih, rapor: true });
+          continue;
+        }
         const alanlar = { driveId: f.id, driveAd: ad, ...(ayar.gorselSakla ? { dosya: yerelKaydet(buf, f.name) } : {}) };
         const { kayit, durum } = await kaydaIsle(okunan, alanlar);
         if (durum.startsWith('mevcut')) ozet.baglanan++; else ozet.yeni++;
@@ -556,7 +641,7 @@ app.get('/api/icmal/:tur', hata(async (req, res) => {
   res.json({
     baslik: icmal.baslik, html: icmal.html, uyarilar: icmal.uyarilar,
     excel: { basliklar: icmal.excel.basliklar, satirlar: icmal.excel.satirlar },
-    gorevSayisi: icmal.gorevler.length, gorselSayisi: icmal.gorevler.filter(gorselVar).length
+    gorevSayisi: icmal.gorevler.length, gorselSayisi: icmal.gorevler.filter(gorselVar).length, raporSayisi: icmal.gorevler.filter(raporVar).length
   });
 }));
 
@@ -577,8 +662,12 @@ app.get('/api/icmal/:tur/html', hata(async (req, res) => {
 
 app.get('/api/icmal/:tur/pdf', hata(async (req, res) => {
   const { icmal } = await icmalHazirla(req);
-  const buf = await pdfUret(icmal.gorevler.filter(gorselVar), gorselGetir);
+  // ?rapor=1: her görev emrinin ardından taranmış görev sonu raporu da eklenir
+  const raporlu = req.query.rapor === '1';
+  const sayfalar = icmal.gorevler.flatMap(g => [...(gorselVar(g) ? [{ g, tur: 'emir' }] : []), ...(raporlu && raporVar(g) ? [{ g, tur: 'rapor' }] : [])]);
+  const buf = await pdfUret(sayfalar, (x) => x.tur === 'rapor' ? raporGorseliGetir(x.g) : gorselGetir(x.g));
   if (!buf) return res.status(404).json({ hata: 'Bu icmaldeki görevlerin görüntüsü yok.' });
+  // (rapor=1 ise taranmış görev sonu raporları da eklenmiştir)
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(dosyaAdi(icmal.baslik) + '_gorev_emirleri')}.pdf`);
   res.send(buf);

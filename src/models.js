@@ -18,6 +18,13 @@ const GorevSchema = new mongoose.Schema({
   driveId: { type: String, index: true },       // Drive'dan alınan görüntünün dosya kimliği (görüntü sunucuda tutulmaz)
   driveAd: String,                              // Drive'daki dosya adı / alt klasör yolu
   ocrMetin: String,
+  // Görev sonu raporu: göreve özel metin (boşsa Ayarlar'daki), imzalı taranmış raporun görüntüsü
+  raporMetni: String,
+  raporIsletme: String,
+  raporDosya: String,                           // yerel kopya (görüntü saklama açıksa)
+  raporDriveId: { type: String, index: true },
+  raporDriveAd: String,
+  raporYuklendi: Date,                          // taranmış rapor ilk bağlandığında
   onayli: { type: Boolean, default: false },
   okunanUnvanlar: { type: Object, default: {} },   // OCR'ın ünvan sütunundan okuduğu { ad: görev }; onaylanınca yeni kişiye yazılır
   ornek: { type: Boolean, default: false }          // uydurma örnek veri (gerçek belgelerle eşleştirilmez)
@@ -63,6 +70,9 @@ const AyarSchema = new mongoose.Schema({
   // Belge şablonları: { puantaj|ekozel|arac|seyyar: { sayi, imza } } — EDYS sayı satırı ve imza bloğu.
   // Tanımlanmayan parça için src/icmal/sablon.js'teki varsayılan kullanılır.
   sablonlar: { type: mongoose.Schema.Types.Mixed, default: {} },
+  // Görev sonu raporu (boş bırakılanlar için src/rapor.js'teki varsayılanlar)
+  raporIsletme: String, raporSonuc: String, raporGorulduAd: String, raporGorulduUnvan: String,
+  raporLogo: String,                                               // antetteki logo (data: URL, isteğe bağlı)
   sayiEkOzel: String, sayiArac: String, sayiSeyyar: String,          // eski sürümler (sablonlar'a taşınır)
   tatiller: [TatilSchema],
   mahalliDisi: [MdSchema]

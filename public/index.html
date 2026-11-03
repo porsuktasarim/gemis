@@ -108,6 +108,7 @@
                   <input type="file" id="dosyaSec" accept="image/jpeg,image/png" multiple hidden>
                 </label>
                 <button class="btn btn-outline-secondary btn-sm" id="yeniGorev"><i class="bi bi-plus-lg"></i> Elle ekle</button>
+                <button class="btn btn-outline-dark btn-sm" id="raporlarYazdir" title="Seçili aydaki her görev için Görevlendirme ve Görev Sonu Raporu"><i class="bi bi-printer"></i> Görev sonu raporları</button>
               </div>
               <div id="yukleDurum" class="small text-body-secondary mt-2"></div>
             </div>
@@ -164,6 +165,7 @@
                 <a class="btn btn-success btn-sm" id="indirXlsx"><i class="bi bi-file-earmark-excel"></i> Excel (.xlsx) indir</a>
                 <a class="btn btn-outline-secondary btn-sm" id="indirHtml"><i class="bi bi-filetype-html"></i> HTML dosyası indir</a>
                 <a class="btn btn-danger btn-sm" id="indirPdf"><i class="bi bi-file-earmark-pdf"></i> Görev emirleri PDF</a>
+                <div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" role="switch" id="pdfRapor"><label class="form-check-label small" for="pdfRapor">Taranmış görev sonu raporlarını da ekle</label></div>
                 <span class="small text-body-secondary ms-auto" id="icmalBilgi"></span>
               </div>
             </div>
@@ -255,6 +257,19 @@
                   <div class="form-text" id="sablonImzacilar"></div></div>
                 <div class="col-12 form-text">Excel çıktısının imza kısmı imza bloğundan çıkarılır: (@IMZA_1) personel, (@IMZA_2) şube müdürü, (@IMZA_3) il müdür yardımcısı ünvanıyla yazılır. Değişiklikler "Kaydet" ile saklanır.</div>
               </div></div>
+              <div class="card card-secondary card-outline mt-3"><div class="card-header"><h3 class="card-title">Görev sonu raporu</h3></div><div class="card-body row g-2">
+                <div class="col-12"><label class="form-label small mb-0">İşletme/Yer (varsayılan)</label><input class="form-control form-control-sm" name="raporIsletme" placeholder="Mera Kanunu kapsamındaki taşınmazlar"></div>
+                <div class="col-12"><label class="form-label small mb-0">Görev sonucu metni (varsayılan)</label><textarea class="form-control form-control-sm" name="raporSonuc" rows="2" placeholder="4342 Sayılı Mera Kanunu kapsamında gerekli kontrol ve incelemeler yapıldı."></textarea></div>
+                <div class="col-md-6"><label class="form-label small mb-0">"Görüldü" imzacısı adı</label><input class="form-control form-control-sm" name="raporGorulduAd" placeholder="Ad SOYAD"></div>
+                <div class="col-md-6"><label class="form-label small mb-0">"Görüldü" imzacısı ünvanı</label><input class="form-control form-control-sm" name="raporGorulduUnvan" placeholder="Şube Müdürü"></div>
+                <div class="col-12"><label class="form-label small mb-0">Antet logosu (isteğe bağlı)</label>
+                  <div class="d-flex gap-2 align-items-center">
+                    <img id="raporLogoOn" alt="" style="height:48px;max-width:96px;object-fit:contain" hidden>
+                    <input type="file" class="form-control form-control-sm" id="raporLogoSec" accept="image/png,image/jpeg">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="raporLogoSil">Kaldır</button>
+                  </div>
+                  <div class="form-text">Görüntü küçültülerek ayarlarda saklanır. Plaka listesinde açıklaması "özel" ya da "kiralık" olan araçlar raporda Özel, diğerleri Resmi işaretlenir.</div></div>
+              </div></div>
               <div class="card card-secondary card-outline mt-3"><div class="card-header"><h3 class="card-title">Seyyar görev – mahalli dışı yerler</h3></div><div class="card-body">
                 <label class="form-label small">Her satıra: İlçe: Mahalle1, Mahalle2, …</label>
                 <textarea class="form-control form-control-sm font-monospace" name="mahalliDisi" rows="10"></textarea>
@@ -342,6 +357,20 @@
                 <input class="form-control" id="kisiEkle" list="kisiListe" placeholder="Listeden kişi ekle">
                 <button class="btn btn-outline-secondary" type="button" id="kisiEkleBtn">Ekle</button>
               </div>
+            </div>
+            <div class="col-12">
+              <details id="raporAyrinti"><summary class="small text-body-secondary">Görev sonu raporu <span id="raporDurum"></span></summary>
+                <div class="row g-2 mt-1">
+                  <div class="col-12"><label class="form-label small mb-0">İşletme/Yer</label><input class="form-control form-control-sm" name="raporIsletme" placeholder="Boşsa Ayarlar'daki metin yazılır"></div>
+                  <div class="col-12"><label class="form-label small mb-0">Görev sonucu</label><textarea class="form-control form-control-sm" name="raporMetni" rows="2" placeholder="Boşsa Ayarlar'daki metin yazılır"></textarea></div>
+                  <div class="col-12 form-text">Ekip başkanı, görevli personel listesindeki ilk kişidir; sırayı listeden değiştirebilirsiniz. İmzalı rapor taranıp "Görev emri yükle" ya da Drive ile yüklendiğinde sıra numarasından bu göreve kendiliğinden bağlanır.</div>
+                  <div class="col-12 d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-outline-dark btn-sm" id="raporYazdir"><i class="bi bi-printer"></i> Raporu yazdır</button>
+                    <a class="btn btn-outline-success btn-sm" id="raporGorselAc" target="_blank" hidden><i class="bi bi-file-earmark-check"></i> Taranmış raporu aç</a>
+                    <button type="button" class="btn btn-outline-danger btn-sm" id="raporKaldir" hidden><i class="bi bi-x-lg"></i> Rapor bağlantısını kaldır</button>
+                  </div>
+                </div>
+              </details>
             </div>
             <div class="col-12 form-check ms-1 mt-2">
               <input class="form-check-input" type="checkbox" name="onayli" id="onayli">

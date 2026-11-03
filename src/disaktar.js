@@ -88,7 +88,7 @@ async function pdfUret(gorevler, gorselGetir) {
   let eklenen = 0;
   for (const g of gorevler) {
     let veri;
-    try { veri = await gorselGetir(g); } catch (e) { console.error(`PDF: ${g.tarih} görüntüsü alınamadı: ${e.message}`); continue; }
+    try { veri = await gorselGetir(g); } catch (e) { console.error(`PDF: ${(g.g || g).tarih} görüntüsü alınamadı: ${e.message}`); continue; }
     if (!veri) continue;
     const jpg = await sharp(veri).rotate().jpeg({ quality: 85 }).toBuffer();
     const img = await pdf.embedJpg(jpg);

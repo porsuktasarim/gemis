@@ -95,6 +95,7 @@ async function gorevleriYukle() {
       <td>${esc(g.belgeNo) || bos}</td>
       <td class="small">${esc((Array.isArray(g.personel) ? g.personel : []).join(', '))}</td>
       <td>${g.ornek ? '<span class="badge text-bg-secondary">Örnek</span> ' : ''}${g.onayli ? '<span class="badge text-bg-success">Kontrol edildi</span>' : '<span class="badge text-bg-warning">Kontrol bekliyor</span>'}
+          ${g.raporYuklendi ? '<i class="bi bi-file-earmark-check text-success" title="İmzalı görev sonu raporu yüklendi"></i>' : ''}
           ${g.driveId ? '<i class="bi bi-google text-muted" title="Görüntü Drive\'da"></i>' : g.dosya ? '<i class="bi bi-image text-muted" title="Görüntü sunucuda"></i>' : '<i class="bi bi-image text-danger" title="Görüntü yok"></i>'}</td>
       <td><button class="btn btn-sm btn-link p-0"><i class="bi bi-pencil"></i></button></td>
     </tr>`;
@@ -128,7 +129,7 @@ $('#dosyaSec').addEventListener('change', async (e) => {
     try {
       const r = await fetch('/api/gorevler/yukle', { method: 'POST', body: fd });
       const j = await r.json(); if (!r.ok) throw new Error(j.hata);
-      j.forEach(k => { if (k.id) oturumDosyalari.set(String(k.id), dosyalar[i]); });
+      j.forEach(k => { if (k.id && !k.rapor) oturumDosyalari.set(String(k.id), dosyalar[i]); });
       sonuc.push(...j);
     } catch (err) { sonuc.push({ dosya: dosyalar[i].name, durum: 'HATA: ' + err.message }); }
   }
@@ -188,6 +189,15 @@ function formDoldur(g) {
   form.donus.value = g.donus || '';
   form.personel.value = (g.personel || []).join('\n');
   form.onayli.checked = !!g.onayli;
+  form.raporIsletme.value = g.raporIsletme || '';
+  form.raporMetni.value = g.raporMetni || '';
+  const raporGorseli = !!(g.raporDosya || g.raporDriveId);
+  $('#raporDurum').innerHTML = g.raporYuklendi ? `<span class="badge text-bg-success">imzalı rapor yüklendi${raporGorseli ? '' : ' (görüntü saklanmadı)'}</span>` : '';
+  $('#raporGorselAc').hidden = !raporGorseli;
+  if (raporGorseli) $('#raporGorselAc').href = `/api/gorevler/${g._id}/rapor-gorsel`;
+  $('#raporKaldir').hidden = !g.raporYuklendi;
+  $('#raporYazdir').disabled = !g._id;
+  $('#raporYazdir').title = g._id ? '' : 'Önce kaydediniz';
   $('#ocrMetin').textContent = g.ocrMetin || '';
   yerOnizle();
   kisiBilgisiGoster();
@@ -351,13 +361,43 @@ $('#gorevKaydet').addEventListener('click', async () => {
     tarih: form.tarih.value, belgeNo: form.belgeNo.value, gorevTuru: form.gorevTuru.value,
     yerHam: form.yerHam.value, plaka: form.plaka.value, surucu: form.surucu.value,
     cikis: form.cikis.value, donus: form.donus.value,
-    personel: form.personel.value.split('\n').map(s => s.trim()).filter(Boolean), onayli: form.onayli.checked
+    personel: form.personel.value.split('\n').map(s => s.trim()).filter(Boolean), onayli: form.onayli.checked,
+    raporIsletme: form.raporIsletme.value, raporMetni: form.raporMetni.value
   };
   const id = form._id.value;
   await api(id ? `/api/gorevler/${id}` : '/api/gorevler', { method: id ? 'PUT' : 'POST', body: JSON.stringify(veri) });
   modal.hide(); bildir('Kaydedildi.');
   if (veri.tarih) $('#gorevAy').value = veri.tarih.slice(0, 7);
   gorevleriYukle(); onerileriYukle();
+});
+
+// Görev sonu raporu: kaydedilmemiş değişiklikler önce kaydedilir, sonra yazdırma sayfası açılır
+$('#raporYazdir').addEventListener('click', async () => {
+  const id = form._id.value;
+  if (!id) return;
+  const sekme = window.open('about:blank', '_blank');
+  try {
+    await api(`/api/gorevler/${id}`, { method: 'PUT', body: JSON.stringify({
+      tarih: form.tarih.value, belgeNo: form.belgeNo.value, gorevTuru: form.gorevTuru.value,
+      yerHam: form.yerHam.value, plaka: form.plaka.value, surucu: form.surucu.value,
+      cikis: form.cikis.value, donus: form.donus.value,
+      personel: form.personel.value.split('\n').map(s => s.trim()).filter(Boolean), onayli: form.onayli.checked,
+      raporIsletme: form.raporIsletme.value, raporMetni: form.raporMetni.value
+    }) });
+    if (sekme) sekme.location = `/rapor?id=${id}`; else location.href = `/rapor?id=${id}`;
+    gorevleriYukle();
+  } catch (e) { if (sekme) sekme.close(); bildir('Kaydedilemedi: ' + e.message); }
+});
+$('#raporKaldir').addEventListener('click', async () => {
+  if (!aktifGorev?._id || !confirm('Taranmış raporun bu görevle bağlantısı kaldırılsın mı?')) return;
+  await api(`/api/gorevler/${aktifGorev._id}/rapor`, { method: 'DELETE' });
+  aktifGorev = await api(`/api/gorevler/${aktifGorev._id}`); formDoldur(aktifGorev); gorevleriYukle();
+});
+// Seçili aydaki bütün görevlerin raporları (Tüm aylar açıksa yine seçili ay)
+$('#raporlarYazdir').addEventListener('click', () => {
+  const ay = $('#gorevAy').value;
+  if (!ay) return bildir('Önce ay seçiniz.');
+  window.open(`/rapor?ay=${ay}`, '_blank');
 });
 
 $('#gorevSil').addEventListener('click', async () => {
@@ -411,6 +451,8 @@ function sorgu() {
   return `${t}?${p}`;
 }
 
+let pdfBaglantisi = () => {};
+$('#pdfRapor').addEventListener('change', () => pdfBaglantisi());
 $('#icmalOlustur').addEventListener('click', async () => {
   try {
     const q = sorgu();
@@ -418,9 +460,10 @@ $('#icmalOlustur').addEventListener('click', async () => {
     const [tur, params] = q.split('?');
     $('#indirXlsx').href = `/api/icmal/${tur}/xlsx?${params}`;
     $('#indirHtml').href = `/api/icmal/${tur}/html?${params}`;
-    $('#indirPdf').href = `/api/icmal/${tur}/pdf?${params}`;
-    $('#indirPdf').classList.toggle('disabled', !sonIcmal.gorselSayisi);
-    $('#icmalBilgi').textContent = `${sonIcmal.excel.satirlar.length} satır · ${sonIcmal.gorevSayisi} görev · ${sonIcmal.gorselSayisi} görüntü`;
+    pdfBaglantisi = () => { $('#indirPdf').href = `/api/icmal/${tur}/pdf?${params}${$('#pdfRapor').checked ? '&rapor=1' : ''}`; };
+    pdfBaglantisi();
+    $('#indirPdf').classList.toggle('disabled', !sonIcmal.gorselSayisi && !sonIcmal.raporSayisi);
+    $('#icmalBilgi').textContent = `${sonIcmal.excel.satirlar.length} satır · ${sonIcmal.gorevSayisi} görev · ${sonIcmal.gorselSayisi} görüntü · ${sonIcmal.raporSayisi || 0} imzalı rapor görüntüsü`;
     $('#icmalIslem').hidden = false;
     $('#icmalUyari').innerHTML = sonIcmal.uyarilar.length
       ? `<div class="alert alert-warning py-2 small"><strong>Kontrol edilecekler:</strong><ul class="mb-0">${sonIcmal.uyarilar.map(u => `<li>${esc(u)}</li>`).join('')}</ul></div>` : '';
@@ -493,9 +536,27 @@ $('#sablonImza').addEventListener('input', () => { sablonKutulariAl(); imzacilar
 sablonTurSec.addEventListener('change', sablonKutulariDoldur);
 $('#sablonVarsayilan').addEventListener('click', () => { delete sablonlar[sablonTurSec.value]; sablonKutulariDoldur(); });
 
+// Rapor antet logosu: tarayıcıda en fazla 400 piksele küçültülüp data: URL olarak ayarlarda saklanır
+let raporLogo = '';
+function logoGoster() { $('#raporLogoOn').hidden = !raporLogo; if (raporLogo) $('#raporLogoOn').src = raporLogo; }
+$('#raporLogoSec').addEventListener('change', (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    const k = Math.min(1, 400 / Math.max(img.width, img.height));
+    const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    raporLogo = c.toDataURL('image/png'); logoGoster(); URL.revokeObjectURL(img.src);
+    bildir('Logo seçildi; "Kaydet" ile saklanır.');
+  };
+  img.src = URL.createObjectURL(f);
+});
+$('#raporLogoSil').addEventListener('click', () => { raporLogo = ''; $('#raporLogoSec').value = ''; logoGoster(); });
+
 async function ayarlariYukle() {
   const [a, kisiler, plakalar, sv] = await Promise.all([api('/api/ayarlar'), api('/api/kisiler'), api('/api/plakalar'), api('/api/sablon-varsayilan')]);
   sablonVarsayilan = sv; sablonlar = JSON.parse(JSON.stringify(a.sablonlar || {}));
+  raporLogo = a.raporLogo || ''; logoGoster();
   sablonKutulariDoldur();
   $('#plakalarAlan').value = plakalar.map(p => [p.plaka, p.aciklama].filter(Boolean).join('; ')).join('\n');
   for (const el of af.elements) {
@@ -525,6 +586,7 @@ af.addEventListener('submit', async (e) => {
   for (const el of af.elements) if (el.name && el.name !== 'tatiller' && el.name !== 'mahalliDisi') veri[el.name] = el.type === 'checkbox' ? el.checked : el.value;
   veri.driveOtoTaraDk = Number(veri.driveOtoTaraDk) || 0;
   veri.sablonlar = sablonlar;
+  veri.raporLogo = raporLogo;
   veri.ocrHaricAdlar = af.ocrHaricAdlar.value.split(',').map(s => s.trim()).filter(Boolean);
   veri.tatiller = af.tatiller.value.split('\n').map(s => s.split(';').map(x => x.trim())).filter(p => tarihISO(p[0]))
     .map(p => ({ tarih: tarihISO(p[0]), ad: p[1] || '', yarim: /yar[ıi]m/i.test(p[2] || '') }));
@@ -587,8 +649,8 @@ $('#driveTara').addEventListener('click', async () => {
       $('#yukleDurum').innerHTML = `<span class="spinner-border spinner-border-sm"></span> ${ilerleme}`;
     } while (d.calisiyor);
     const o = d.sonuc || { bulunan: 0, yeni: 0, baglanan: 0, hata: [], kayitlar: [] };
-    const satir = [`Drive: ${o.bulunan} görüntü bulundu, ${o.yeni} yeni kayıt, ${o.baglanan} mevcut kayıt güncellendi.`];
-    if (o.bulunan && !o.yeni && !o.baglanan && !o.hata.length) satir.push('Yeni görüntü yok; daha önce işlenenler atlandı.');
+    const satir = [`Drive: ${o.bulunan} görüntü bulundu, ${o.yeni} yeni kayıt, ${o.baglanan} mevcut kayıt güncellendi${o.rapor ? `, ${o.rapor} görev sonu raporu bağlandı` : ''}.`];
+    if (o.bulunan && !o.yeni && !o.baglanan && !o.rapor && !o.hata.length) satir.push('Yeni görüntü yok; daha önce işlenenler atlandı.');
     o.kayitlar.forEach(k => satir.push(`${esc(k.dosya)}: ${esc(k.durum)}${k.tarih ? ` (${tarihTR(k.tarih)})` : ''}`));
     o.hata.forEach(h => satir.push(`<span class="text-danger">${esc(h)}</span>`));
     $('#yukleDurum').innerHTML = satir.join('<br>');

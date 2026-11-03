@@ -110,6 +110,22 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
 - **Plakalar** her yerde boşluksuz ve büyük harfle tutulur (`34ABC2159`).
   Eski "34 ABC 2159" yazımları açılışta kendiliğinden çevrilir.
 
+- **Görevlendirme ve Görev Sonu Raporu**
+  - Her görev emri için A4 tek sayfalık rapor, kayıttaki bilgilerle (sıra no, ekip başkanı,
+    görev konusu, ilçe/mahalle, çıkış tarihi ve saatleri, plaka, görevli personelin imza
+    alanları, "Görüldü" bölümü) yazdırmaya hazır olarak üretilir.
+  - Tek görev için düzenleme penceresindeki *Raporu yazdır*, seçili ayın bütün görevleri
+    için listedeki *Görev sonu raporları* düğmesi kullanılır. Rapor tarihi sayfanın üstünden
+    değiştirilebilir (varsayılan: bugün).
+  - Ekip başkanı görevli personel listesindeki ilk kişidir. İşletme/Yer ve görev sonucu
+    metni Ayarlar'da tanımlanır, gerekirse göreve özel değiştirilir. Antet logosu isteğe
+    bağlıdır ve Ayarlar'dan yüklenir.
+  - İmzalanıp taranan rapor, görev emirleri gibi yüklenir (elle ya da Drive). OCR raporu
+    tanır, sıra numarasından (ve sayfa altındaki `GEMİS-R` satırından) ilgili göreve bağlar;
+    yeni görev açmaz. Listede rapor yüklenen görevler işaretlenir.
+  - Görev emirleri PDF'ine *Taranmış görev sonu raporlarını da ekle* seçeneğiyle raporlar
+    da eklenebilir (görüntü saklama açıksa ya da rapor Drive'dan geldiyse).
+
 ## Arayüz
 
 Arayüz [AdminLTE 4](https://adminlte.io/themes/v4/) temasıyla hazırlanmıştır:
