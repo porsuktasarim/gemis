@@ -73,7 +73,9 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
   - OCR'ın kontrol edilmemiş okumaları listeleri değiştirmez.
   - Belgenin ünvan sütunundan okunan görev (Mühendis, İşçi…) yeni kişiye yazılır.
 - **Görev ve aynı kişi bilgisi**
-  - Düzenleme formunda her görevlinin ve sürücünün listedeki görevi gösterilir. Sürücünün şoför mü mühendis mi olduğu ve görevlilerden biriyle aynı kişi olup olmadığı görülür.
+  - Düzenleme formunda her görevlinin listedeki görevi gösterilir.
+  - Sürücü alanında ve sürücü önerilerinde kadro görevi değil "Şoför" yazar. Sürücü görevlilerden biriyse "aynı zamanda görevli" etiketi çıkar.
+  - Listede olmayan biri yalnızca sürücü olarak onaylanırsa kişi listesine "Şoför" göreviyle eklenir.
   - Listede olmayan adlar ve plakalar işaretlenir.
   - OCR benzer adlar arasında karar verirken belgedeki ünvanı ve görevli listesini dikkate alır.
 - **Belge no**

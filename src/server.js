@@ -138,11 +138,11 @@ function gorevTemizle(b) {
 // unvanlar: OCR'ın ünvan sütunundan okuduğu { ad: ünvan } eşlemesi
 async function adlariDuzenle(g, unvanlar = {}, ekle = false) {
   const kisiler = await Kisi.find().lean();
-  const isle = async (ham, ipucu = {}) => {
+  const isle = async (ham, ipucu = {}, varsayilanUnvan = '') => {
     if (!ham || !String(ham).trim()) return '';
     const r = kanonikAd(String(ham), kisiler, 0.2, ipucu);
     if (!r.ad) return '';
-    const unvan = r.unvan || unvanlar[ham] || unvanlar[r.ad] || '';
+    const unvan = r.unvan || unvanlar[ham] || unvanlar[r.ad] || varsayilanUnvan;
     if (ekle && !r.kayitli) {
       await Kisi.updateOne({ ad: r.ad }, { $setOnInsert: { ad: r.ad, unvan } }, { upsert: true });
       kisiler.push({ ad: r.ad, unvan });
@@ -157,7 +157,13 @@ async function adlariDuzenle(g, unvanlar = {}, ekle = false) {
     g.personel = l;
   }
   // Sürücü görevlilerden biriyse aynı kişi olarak bağlanır
-  if (typeof g.surucu === 'string') g.surucu = await isle(g.surucu, { tercih: new Set(g.personel || []) });
+  // Yalnızca sürücü olarak geçen yeni kişi listeye "Şoför" göreviyle eklenir
+  if (typeof g.surucu === 'string') {
+    const gorevliler = new Set(g.personel || []);
+    const ad = await isle(g.surucu, { tercih: gorevliler }, '');
+    g.surucu = ad;
+    if (ekle && ad && !gorevliler.has(ad)) await Kisi.updateOne({ ad, $or: [{ unvan: null }, { unvan: '' }] }, { $set: { unvan: 'Şoför' } });
+  }
   if (typeof g.plaka === 'string' && g.plaka) {
     g.plaka = plakaBicim(g.plaka);
     if (ekle && /^\d{2} [A-ZÇĞİÖŞÜ]{1,3} \d{2,5}$/.test(g.plaka)) await Plaka.updateOne({ plaka: g.plaka }, { $setOnInsert: { plaka: g.plaka } }, { upsert: true });

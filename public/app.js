@@ -60,6 +60,11 @@ async function onerileriYukle() {
   // Kişi önerisi tek kayıttan: değer "Ad SOYAD", yanında görevi
   $('#kisiListe').innerHTML = o.kisiler.slice().sort((a, b) => a.ad.localeCompare(b.ad, 'tr'))
     .map(k => `<option value="${esc(k.ad)}"${k.unvan ? ` label="${esc(k.unvan)}"` : ''}>`).join('');
+  // Sürücü önerisi: herkes "Şoför" olarak görünür; kadrosu şoför olanlar önce
+  const soforMu = (k) => /şoför|sofor/i.test(k.unvan || '');
+  $('#surucuListe').innerHTML = o.kisiler.slice()
+    .sort((a, b) => (soforMu(b) - soforMu(a)) || a.ad.localeCompare(b.ad, 'tr'))
+    .map(k => `<option value="${esc(k.ad)}" label="Şoför">`).join('');
 }
 
 // ---------- Görev listesi ----------
@@ -160,7 +165,8 @@ function kisiBilgisiGoster() {
   else {
     const k = kisiBul(sur);
     const gorevli = adlar.some(a => sadeAd(a) === sadeAd(sur));
-    $('#surucuBilgi').innerHTML = `${etiket(sur)}${gorevli ? ' <span class="badge text-bg-info">görevlilerden biri</span>' : ''}${k && k.ad !== sur ? ` <span class="text-body-secondary">→ ${esc(k.ad)}</span>` : ''}`;
+    // Sürücü alanında kadro görevi değil, bu görevdeki rolü yazılır: Şoför
+    $('#surucuBilgi').innerHTML = `<span class="badge text-bg-light border">Şoför</span>${k ? '' : ' <span class="badge text-bg-warning">listede yok</span>'}${gorevli ? ' <span class="badge text-bg-info">aynı zamanda görevli</span>' : ''}${k && k.ad !== sur ? ` <span class="text-body-secondary">→ ${esc(k.ad)}</span>` : ''}`;
   }
   const p = form.plaka.value.trim();
   const pk = p && plakaListesi.find(x => sadeAd(x.plaka) === sadeAd(p));
