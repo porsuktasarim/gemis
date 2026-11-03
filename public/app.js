@@ -189,8 +189,9 @@ function formDoldur(g) {
   form.donus.value = g.donus || '';
   form.personel.value = (g.personel || []).join('\n');
   form.onayli.checked = !!g.onayli;
-  form.raporIsletme.value = g.raporIsletme || '';
-  form.raporMetni.value = g.raporMetni || '';
+  // Göreve özel metin yoksa Ayarlar'daki varsayılan yazılı gelir; değiştirilirse bu göreve özel kaydedilir
+  form.raporIsletme.value = g.raporIsletme || raporVarsayilan.raporIsletme || '';
+  form.raporMetni.value = g.raporMetni || raporVarsayilan.raporSonuc || '';
   const raporGorseli = !!(g.raporDosya || g.raporDriveId);
   $('#raporDurum').innerHTML = g.raporYuklendi ? `<span class="badge text-bg-success">imzalı rapor yüklendi${raporGorseli ? '' : ' (görüntü saklanmadı)'}</span>` : '';
   $('#raporGorselAc').hidden = !raporGorseli;
@@ -203,7 +204,22 @@ function formDoldur(g) {
   kisiBilgisiGoster();
 }
 
+// Ayarlar'daki rapor varsayılanları (görev penceresinde ön dolu gelir)
+let raporVarsayilan = {};
+async function raporVarsayilaniYukle() {
+  try { const a = await api('/api/ayarlar'); raporVarsayilan = { raporIsletme: a.raporIsletme || '', raporSonuc: a.raporSonuc || '' }; } catch { /* boş kalır */ }
+}
+// Varsayılanla aynı metin göreve ayrıca yazılmaz; böylece Ayarlar'da metin değişince bu görev de güncel kalır
+function raporAlanlari() {
+  const i = form.raporIsletme.value.trim(), m = form.raporMetni.value.trim();
+  return {
+    raporIsletme: i === (raporVarsayilan.raporIsletme || '').trim() ? '' : i,
+    raporMetni: m === (raporVarsayilan.raporSonuc || '').trim() ? '' : m
+  };
+}
+
 async function gorevAc(id) {
+  await raporVarsayilaniYukle();
   aktifGorev = id ? await api(`/api/gorevler/${id}`) : { personel: [] };
   formDoldur(aktifGorev);
   aktifYerelDosya = id ? oturumDosyalari.get(String(id)) || null : null;
@@ -362,7 +378,7 @@ $('#gorevKaydet').addEventListener('click', async () => {
     yerHam: form.yerHam.value, plaka: form.plaka.value, surucu: form.surucu.value,
     cikis: form.cikis.value, donus: form.donus.value,
     personel: form.personel.value.split('\n').map(s => s.trim()).filter(Boolean), onayli: form.onayli.checked,
-    raporIsletme: form.raporIsletme.value, raporMetni: form.raporMetni.value
+    ...raporAlanlari()
   };
   const id = form._id.value;
   await api(id ? `/api/gorevler/${id}` : '/api/gorevler', { method: id ? 'PUT' : 'POST', body: JSON.stringify(veri) });
@@ -382,7 +398,7 @@ $('#raporYazdir').addEventListener('click', async () => {
       yerHam: form.yerHam.value, plaka: form.plaka.value, surucu: form.surucu.value,
       cikis: form.cikis.value, donus: form.donus.value,
       personel: form.personel.value.split('\n').map(s => s.trim()).filter(Boolean), onayli: form.onayli.checked,
-      raporIsletme: form.raporIsletme.value, raporMetni: form.raporMetni.value
+      ...raporAlanlari()
     }) });
     if (sekme) sekme.location = `/rapor?id=${id}`; else location.href = `/rapor?id=${id}`;
     gorevleriYukle();

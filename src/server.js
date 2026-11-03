@@ -8,7 +8,7 @@ const crypto = require('crypto');
 const { Gorev, Kisi, Ayar, Plaka } = require('./models');
 const { VARSAYILAN: SABLON_VARSAYILAN, ESKI_SAYI, imzaCoz } = require('./icmal/sablon');
 const { gorevOku } = require('./ocr');
-const { raporSayfasi, raporTani, siraNo } = require('./rapor');
+const { raporSayfasi, raporTani, siraNo, VARSAYILAN: RAPOR_VARSAYILAN } = require('./rapor');
 const { secimOku } = require('./secimOku');
 const { icmalUret, TURLER } = require('./icmal');
 const { excelUret, pdfUret } = require('./disaktar');
@@ -71,6 +71,10 @@ async function ayarGetir() {
     await Ayar.updateOne({ _id: 'ayar' }, { $set: { sablonlar }, $unset: { sayiEkOzel: 1, sayiArac: 1, sayiSeyyar: 1 } });
     a.sablonlar = sablonlar; delete a.sayiEkOzel; delete a.sayiArac; delete a.sayiSeyyar;
   }
+  // Görev sonu raporunun varsayılan metinleri bir kez ayarlara yazılır; sonra Ayarlar'dan değiştirilir
+  const raporEksik = {};
+  for (const k of ['raporIsletme', 'raporSonuc', 'raporGorulduUnvan']) if (typeof a[k] !== 'string') raporEksik[k] = RAPOR_VARSAYILAN[k];
+  if (Object.keys(raporEksik).length) { await Ayar.updateOne({ _id: 'ayar' }, { $set: raporEksik }); Object.assign(a, raporEksik); }
   elyazisi.ayarla(a.elYazisiMotoru || 'paddle');
   return a;
 }

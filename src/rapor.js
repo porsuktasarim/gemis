@@ -1,7 +1,7 @@
 // Görevlendirme ve Görev Sonu Raporu: her görev emri için A4 tek sayfa, yazdırmaya hazır HTML.
 // Rapor imzalatılıp taranınca yeniden yüklenir; OCR raporu tanır ve sıra numarasından göreve bağlar
 // (raporTani). Sayfanın altındaki küçük "GEMİS-R" satırı bu eşleştirmeyi kolaylaştırır.
-const { esc, tarihTR, trUpper, sade } = require('./util');
+const { esc, trUpper, sade } = require('./util');
 
 const VARSAYILAN = {
   raporIsletme: 'Mera Kanunu kapsamındaki taşınmazlar',
@@ -11,12 +11,12 @@ const VARSAYILAN = {
 };
 const ayarDegeri = (ayar, k) => (typeof ayar?.[k] === 'string' && ayar[k].trim() ? ayar[k] : VARSAYILAN[k]);
 
-// Belge no: kayıtta 6 hane (051934), raporda kâğıttaki gibi baştaki sıfırsız (51934)
-const siraNo = (b) => String(b || '').replace(/^0+(?=\d)/, '');
+// Taşıt görev emri sıra no: her zaman 6 hane, gerekirse başına sıfır (51934 → 051934)
+const siraNo = (b) => { const d = String(b || '').replace(/\D/g, ''); return d ? d.padStart(6, '0') : ''; };
 // Görevin konusu: kanun numarası yazılmaz ("4342 sayılı Mera Kanunu Uygulamaları" → "Mera Kanunu Uygulamaları")
 const konu = (g) => (g.gorevTuru || '').replace(/^\d+\s+sayılı\s+/i, '');
-// Tarih: "6.10.2026" (rapordaki gibi gün başında sıfır yok)
-const kisaTarih = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? `${Number(m[3])}.${m[2]}.${m[1]}` : ''; };
+// Tarih: gün ve ay iki hane (06.10.2026)
+const kisaTarih = (iso) => { const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(iso || ''); return m ? `${m[3].padStart(2, '0')}.${m[2].padStart(2, '0')}.${m[1]}` : ''; };
 
 function yerSatirlari(yer) {
   const y = (yer || []).filter(x => x && (x.ilce || x.mahalleler?.length));
@@ -60,34 +60,34 @@ function birRapor(g, ayar, { kisiler, plakalar, raporTarihi }) {
 
   <table class="form">
     <colgroup><col style="width:27%"><col style="width:13%"><col style="width:17%"><col style="width:9%"><col style="width:21%"><col style="width:13%"></colgroup>
-    <tr>
+    <tr class="cercevesiz">
       <td>Taşıt Görev Emri Sıra No:</td>
-      <td class="orta kalin buyuk">${esc(siraNo(g.belgeNo))}</td>
-      <td colspan="3" class="bos-hucre"></td>
-      <td class="orta">${esc(raporTarihi ? tarihTR(raporTarihi) : '')}</td>
+      <td class="kalin buyuk">${esc(siraNo(g.belgeNo))}</td>
+      <td colspan="3"></td>
+      <td>${esc(raporTarihi ? kisaTarih(raporTarihi) : '')}</td>
     </tr>
-    <tr class="ara"><td colspan="6"></td></tr>
+    <tr class="ara cercevesiz"><td colspan="6"></td></tr>
     <tr class="yuksek">
       <td>Ekip Başkanının Adı/Soyadı, Ünvanı</td>
       <td colspan="5" class="buyuk">${esc(personel[0] || '')}${personel[0] && unvan(personel[0]) ? ` <span class="ince">– ${esc(unvan(personel[0]))}</span>` : ''}</td>
     </tr>
     <tr><td>Görev Konusu</td><td colspan="5">${esc(konu(g))}</td></tr>
-    <tr><td rowspan="3" class="orta">Göreve Gidilen</td><td>İlçe</td><td colspan="4">${esc(yer.ilce)}</td></tr>
+    <tr><td rowspan="3">Göreve Gidilen</td><td>İlçe</td><td colspan="4">${esc(yer.ilce)}</td></tr>
     <tr><td>Mahalle</td><td colspan="4">${esc(yer.mahalle)}</td></tr>
     <tr><td>İşletme/Yer</td><td colspan="4">${esc(g.raporIsletme || ayarDegeri(ayar, 'raporIsletme'))}</td></tr>
     <tr>
-      <td>Göreve Çıkış Tarihi:</td><td class="orta">${esc(kisaTarih(g.tarih))}</td>
-      <td class="orta">Göreve Çıkış Saati</td><td class="orta">${esc(g.cikis || '')}</td>
-      <td class="orta">Görevden Dönüş Saati</td><td class="orta">${esc(g.donus || '')}</td>
+      <td>Göreve Çıkış Tarihi:</td><td>${esc(kisaTarih(g.tarih))}</td>
+      <td>Göreve Çıkış Saati</td><td>${esc(g.cikis || '')}</td>
+      <td>Görevden Dönüş Saati</td><td>${esc(g.donus || '')}</td>
     </tr>
     <tr>
-      <td>Görevli Araç Plaka No:</td><td class="orta">${esc(g.plaka || '')}</td>
-      <td class="orta">Resmi</td><td class="orta">${tur === 'resmi' ? 'X' : ''}</td>
-      <td class="orta">Özel</td><td class="orta">${tur === 'ozel' ? 'X' : ''}</td>
+      <td>Görevli Araç Plaka No:</td><td>${esc(g.plaka || '')}</td>
+      <td>Resmi</td><td>${tur === 'resmi' ? 'X' : ''}</td>
+      <td>Özel</td><td>${tur === 'ozel' ? 'X' : ''}</td>
     </tr>
   </table>
 
-  <div class="sonuc">${esc(g.raporMetni || ayarDegeri(ayar, 'raporSonuc')).replace(/\n/g, '<br>')}</div>
+  <div class="sonuc" contenteditable="true" spellcheck="false" title="Yazdırmadan önce bu sayfada değiştirilebilir (kaydedilmez)">${esc(g.raporMetni || ayarDegeri(ayar, 'raporSonuc')).replace(/\n/g, '<br>')}</div>
 
   <div class="imzalar">${imzalar}</div>
 
@@ -98,7 +98,10 @@ function birRapor(g, ayar, { kisiler, plakalar, raporTarihi }) {
     <div>${esc(ayarDegeri(ayar, 'raporGorulduUnvan'))}</div>
   </div>
 
-  <footer class="iz">GEMİS-R ${esc(g.belgeNo || '------')} · ${esc(g.tarih || '')}</footer>
+  <footer class="alt">
+    <span class="iz">GEMİS-R ${esc(g.belgeNo || '------')} · ${esc(g.tarih || '')}</span>
+    <span class="birim">${esc(ayar.sube || '')}</span>
+  </footer>
 </section>`;
 }
 
@@ -121,22 +124,30 @@ function raporSayfasi(gorevler, ayar, secenek = {}) {
   .antet { display: grid; grid-template-columns: 30mm 1fr 30mm; align-items: center; margin-bottom: 9mm; }
   .logo { width: 30mm; height: 30mm; object-fit: contain; }
   .antet-metin { text-align: center; font-weight: bold; font-size: 12pt; line-height: 1.45; }
-  table.form { width: 100%; border-collapse: collapse; table-layout: fixed; border: 1.5px solid #000; }
-  table.form td { border: 1px solid #000; padding: 1.6mm 2mm; vertical-align: middle; line-height: 1.25; word-wrap: break-word; }
+  table.form { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  /* Tablodaki bütün hücreler (sıra no, tarihler, saatler, plaka, X dahil) sola yaslıdır */
+  table.form td { border: 1px solid #000; padding: 1.6mm 2mm; text-align: left; vertical-align: middle; line-height: 1.25; word-wrap: break-word; }
+  /* İlk iki satır (sıra no / rapor tarihi ve ara satır) çerçevesizdir */
+  table.form tr.cercevesiz td { border: none; }
   table.form tr.ara td { height: 6mm; padding: 0; }
   table.form tr.yuksek td { height: 14mm; }
-  table.form td.bos-hucre { border-top-color: transparent; border-bottom-color: #000; }
-  .orta { text-align: center; } .kalin { font-weight: bold; } .buyuk { font-size: 12pt; } .ince { font-size: 10pt; }
-  .sonuc { margin: 12mm 0 0; min-height: 22mm; line-height: 1.4; }
-  .imzalar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8mm 4mm; margin-top: 6mm; text-align: center; line-height: 1.35; }
+  .kalin { font-weight: bold; } .buyuk { font-size: 12pt; } .ince { font-size: 10pt; }
+  .sonuc { margin: 12mm 0 0; min-height: 22mm; line-height: 1.4; outline: none; }
+  .sonuc:hover, .sonuc:focus { background: #fff8d6; box-shadow: 0 0 0 1mm #fff8d6; }
+  /* İmza kısmı sola yaslıdır (başlık, ad soyad, ünvan) */
+  .imzalar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8mm 4mm; margin-top: 6mm; text-align: left; line-height: 1.35; }
   .imza-baslik { margin-bottom: 1mm; }
   .imza-alan { height: 16mm; }
   .goruldu { margin: 16mm auto 0; text-align: center; line-height: 1.5; }
-  .iz { margin-top: auto; padding-top: 6mm; text-align: right; font-family: "Courier New", monospace; font-size: 8pt; color: #555; letter-spacing: .5px; }
+  /* Sayfa altı: solda eşleştirme izi (GEMİS-R), sağda şube adı */
+  .alt { margin-top: auto; padding-top: 6mm; display: flex; justify-content: space-between; align-items: flex-end; gap: 6mm; }
+  .iz { font-family: "Courier New", monospace; font-size: 8pt; color: #555; letter-spacing: .5px; }
+  .birim { text-align: right; }
   .bilgi { text-align: center; padding: 40px; }
   @media print {
     body { background: #fff; }
     .arac { display: none; }
+    .sonuc:hover, .sonuc:focus { background: none; box-shadow: none; }
     .sayfa { margin: 0; padding: 0; width: auto; min-height: calc(297mm - 26mm); box-shadow: none; break-after: page; page-break-after: always; }
     .sayfa:last-of-type { break-after: auto; page-break-after: auto; }
   }
@@ -145,7 +156,7 @@ function raporSayfasi(gorevler, ayar, secenek = {}) {
 <div class="arac">
   <button type="button" onclick="window.print()">Yazdır</button>
   <label>Rapor tarihi <input type="date" id="raporTarihi" value="${esc(secenek.raporTarihi || '')}"></label>
-  <span class="not">${gorevler.length} rapor · Yazdırma penceresinde kâğıt A4, kenar boşlukları "Varsayılan", "Üstbilgi ve altbilgi" kapalı olmalıdır.</span>
+  <span class="not">${gorevler.length} rapor · Açıklama metnine tıklayıp bu sayfada değiştirebilirsiniz (kalıcı değişiklik için görev penceresi ya da Ayarlar). Yazdırma penceresinde kâğıt A4, kenar boşlukları "Varsayılan", "Üstbilgi ve altbilgi" kapalı olmalıdır.</span>
 </div>
 ${govde}
 <script>
