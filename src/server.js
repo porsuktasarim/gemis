@@ -12,6 +12,7 @@ const { icmalUret, TURLER } = require('./icmal');
 const { excelUret, pdfUret } = require('./disaktar');
 const { yerAyristir, saatNormal } = require('./util');
 const drive = require('./drive');
+const elyazisi = require('./elyazisi');
 const varsayilan = require('../seed/varsayilan');
 
 const PORT = process.env.PORT || 1138;
@@ -46,6 +47,7 @@ async function ayarGetir() {
     await Ayar.create({ _id: 'ayar', tatiller: varsayilan.tatiller, mahalliDisi: varsayilan.mahalliDisi });
     a = await Ayar.findById('ayar').lean();
   }
+  elyazisi.ayarla(a.elYazisiMotoru || 'paddle');
   return a;
 }
 
@@ -413,7 +415,11 @@ function sistemDenetle() {
     });
   });
 }
-app.get('/api/sistem', (req, res) => res.json(sistem));
+app.get('/api/sistem', async (req, res) => {
+  await elyazisi.denetle();
+  const e = elyazisi.durum;
+  res.json({ ...sistem, elyazisi: { tanimli: e.tanimli, acik: e.acik, motor: e.motor, secim: e.secim, hata: e.tanimli && !e.acik ? e.hata : '' } });
+});
 
 (async () => {
   sistemDenetle();
@@ -424,5 +430,6 @@ app.get('/api/sistem', (req, res) => res.json(sistem));
     }
   }
   await ilkKurulum();
+  await ayarGetir(); // el yazısı motoru seçimini uygula
   app.listen(PORT, () => console.log(`GEMİS http://localhost:${PORT}${drive.tanimli() ? ` · Drive: ${drive.hesapEposta()}` : ''}`));
 })();

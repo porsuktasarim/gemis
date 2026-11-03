@@ -51,6 +51,7 @@ const AyarSchema = new mongoose.Schema({
   ocrHaricAdlar: { type: [String], default: [] },                 // gideceği yer aranırken atlanacak adlar (amirler vb.)
   driveKlasor: { type: String, default: '' },                      // Drive klasör bağlantısı ya da kimliği
   gorselSakla: { type: Boolean, default: false },                  // görüntülerin kopyası sunucuda tutulsun mu
+  elYazisiMotoru: { type: String, default: 'paddle' },             // 'paddle' (servis varsa) | 'tesseract'
   driveOtoTaraDk: { type: Number, default: 0 },                    // otomatik tarama aralığı (dakika, 0 = kapalı)
   mesaiBas: { type: String, default: '08:30' },
   mesaiBit: { type: String, default: '17:00' },

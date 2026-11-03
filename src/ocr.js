@@ -144,32 +144,50 @@ function saatleriBul(metin) {
   return { cikis: s[0] || '', donus: s[1] || '' };
 }
 
-// Kişi adı eşleştirme (el yazısı için daha toleranslı)
+// Aday okumalardan kurala uyan ilkini seç
+function ilkGecerli(adaylar, coz) {
+  for (const a of adaylar || []) { const d = a ? coz(a) : ''; if (d) return d; }
+  return '';
+}
+
+// Kişi adı eşleştirme (el yazısı için daha toleranslı).
+// Ad ve soyad ayrı ayrı karşılaştırılır; en iyi aday ikinciden belirgin biçimde iyi değilse eşleşme yapılmaz.
 function kisiEslestir(ham, kisiler, oran = 0.3) {
-  const h = sade(ham);
-  if (h.length < 4) return '';
-  let en = null, enMesafe = Infinity;
-  for (const k of kisiler) {
-    const a = sade(k.ad);
-    const m = levenshtein(h, a) / Math.max(h.length, a.length);
-    if (m < enMesafe) { enMesafe = m; en = k.ad; }
-    // yalnızca soyadı okunduysa
-    const soyad = sade(k.ad.split(/\s+/).pop());
-    if (soyad.length >= 4 && h.includes(soyad) && 0.1 < enMesafe) { enMesafe = 0.1; en = k.ad; }
-  }
-  return enMesafe <= oran ? en : '';
+  const kelimeler = (ham || '').split(/[\s|,;:]+/).map(sade).filter(k => k.length >= 2);
+  const h = kelimeler.join('');
+  if (h.length < 4 || !kisiler.length) return '';
+  const uzaklik = (a, b) => levenshtein(a, b) / Math.max(a.length, b.length, 1);
+  const puanlar = kisiler.map(k => {
+    const p = k.ad.split(/\s+/).map(sade).filter(Boolean);
+    const tam = uzaklik(h, p.join(''));
+    let parca = 1;
+    if (kelimeler.length >= 2 && p.length >= 2) {
+      parca = (uzaklik(kelimeler[0], p[0]) + uzaklik(kelimeler[kelimeler.length - 1], p[p.length - 1])) / 2;
+    }
+    const soyad = p[p.length - 1];
+    const soyadUz = Math.min(...kelimeler.map(w => uzaklik(w, soyad)));
+    // yalnızca soyad güvenle okunduysa (kısa soyadlarda yanılmamak için en az 5 harf)
+    const soyadPuan = soyad.length >= 5 && soyadUz <= 0.3 ? soyadUz + 0.05 : 1;
+    return { ad: k.ad, puan: Math.min(tam, parca + 0.03, soyadPuan) };
+  }).sort((x, y) => x.puan - y.puan);
+  const [en, ikinci] = puanlar;
+  if (en.puan > Math.max(oran, 0.4)) return '';
+  if (en.puan > oran && ikinci && ikinci.puan - en.puan < 0.12) return '';
+  return en.ad;
 }
 
 function plakaCoz(ham, bilinen = []) {
   const t = (ham || '').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
-  const m = /(\d{2})\s*([A-Z]{1,3})\s*(\d{2,4})/.exec(t);
-  const aday = m ? `${m[1]} ${m[2]} ${m[3]}` : '';
+  // Rakam bölümünde el yazısında sık karışan harfler rakama çevrilir (Z→2, O→0, S→5, B→8, G→6, I→1)
+  const RAKAMA = { O: '0', D: '0', Q: '0', I: '1', L: '1', Z: '2', S: '5', G: '6', B: '8' };
+  const m = /(\d{2})\s*([A-Z]{1,3})\s*([0-9ODQILZSGB]{2,4})(?![0-9])/.exec(t);
+  const aday = m ? `${m[1]} ${m[2]} ${m[3].replace(/[ODQILZSGB]/g, h => RAKAMA[h])}` : '';
   // Daha önce girilen plakalarla karşılaştır (el yazısı hatalarını düzeltir)
   const sik = sade(aday || t);
   if (sik.length >= 5) {
     let en = '', enM = Infinity;
     for (const p of bilinen) { const d = levenshtein(sik, sade(p)); if (d < enM) { enM = d; en = p; } }
-    if (en && enM <= 2) return en;
+    if (en && enM <= 1) return en;   // yalnızca tek karakter farkı: yanlış plakaya yaklaştırmamak için
   }
   return aday;
 }
@@ -222,8 +240,8 @@ async function gorevOku(girdi, orijinalAd, baglam) {
     personel,
     yer,
     yerHam: yer.map(g => [g.ilce, ...g.mahalleler].join('-')).join(', '),
-    surucu: kisiEslestir(z.surucu, kisiler, 0.35),
-    plaka: plakaCoz(z.plaka, bilinenPlakalar) || plakaBul(metin),
+    surucu: ilkGecerli(z.surucuAdaylar || [z.surucu], a => kisiEslestir(a, kisiler, 0.35)),
+    plaka: ilkGecerli(z.plakaAdaylar || [z.plaka], a => { const p = plakaCoz(a, bilinenPlakalar); return /^\d{2} [A-Z]{1,3} \d{2,4}$/.test(p) ? p : ''; }) || plakaBul(metin),
     belgeNo: belgeNoCoz(z.belgeNo),
     cikis: z.cikis || saat.cikis,
     donus: z.donus || saat.donus

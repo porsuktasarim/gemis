@@ -6,6 +6,7 @@
 const { spawn } = require('child_process');
 const sharp = require('sharp');
 const { sade } = require('./util');
+const elyazisi = require('./elyazisi');
 
 const KOYU = 128;
 
@@ -31,7 +32,11 @@ async function hazirla(girdi) {
     .normalise().threshold(170).raw().toBuffer({ resolveWithObject: true });
   const W = info.width, H = info.height;
   const png = await sharp(data, { raw: { width: W, height: H, channels: 1 } }).png().toBuffer();
-  return { data, W, H, png };
+  // Sinir ağı tabanlı el yazısı OCR'ı eşiklenmemiş gri görüntüde daha iyi okur
+  const gri = elyazisi.kullanilabilir()
+    ? await sharp(girdi).rotate().grayscale().resize({ width: genislik }).normalise().png().toBuffer()
+    : null;
+  return { data, W, H, png, gri };
 }
 
 // Tablo çizgileri: uzun dikey ve yatay koyu piksel dizileri.
@@ -71,8 +76,8 @@ function hucre(c, W, H, x, y) {
 
 // Hücreyi kes; kenar çizgisi kalıntılarını ve noktalı satır çizgilerini beyaza boya, kenar boşluğu ekle
 async function kes(png, W, H, k, ic = 8, temizle = false) {
-  const left = Math.max(0, k.x0 + ic), top = Math.max(0, k.y0 + ic);
-  const width = Math.min(W, k.x1 - ic) - left, height = Math.min(H, k.y1 - ic) - top;
+  const left = Math.round(Math.max(0, k.x0 + ic)), top = Math.round(Math.max(0, k.y0 + ic));
+  const width = Math.round(Math.min(W, k.x1 - ic)) - left, height = Math.round(Math.min(H, k.y1 - ic)) - top;
   if (width < 10 || height < 10) return null;
   if (!temizle) {
     return sharp(png).extract({ left, top, width, height })
@@ -107,6 +112,31 @@ async function hucreOku(g, k, psm = 7, ekler = [], temizle = false) {
   if (process.env.ZON_HATA_AYIKLA) require('fs').writeFileSync(`${process.env.ZON_HATA_AYIKLA}/${String(++hataAyiklaSayac).padStart(2, '0')}_${k.x0}_${k.y0}_${k.x1}_${k.y1}.png`, parca);
   return (await tesseract(parca, psm, ekler)).replace(/\s+/g, ' ').trim();
 }
+
+// El yazısı hücresi: PaddleOCR servisi (varsa) aday okumaları + Tesseract okuması.
+// Parça gri görüntüden kesilir, çizgi/noktalı satır kalıntıları silinir, yazının çevresinden kırpılır.
+// Dönen dizinin her elemanı bir adaydır; doğru olanı alanın biçim/eşleştirme kuralı seçer.
+async function elAdaylar(g, k, psm, ekler) {
+  const adaylar = [];
+  if (g.gri && elyazisi.kullanilabilir()) {
+    let parca = await kes(g.gri, g.W, g.H, k, 8, true);
+    if (parca) {
+      try {
+        parca = await sharp(parca).trim({ background: '#ffffff', threshold: 60 })
+          .extend({ top: 12, bottom: 12, left: 12, right: 12, background: '#ffffff' }).png().toBuffer();
+      } catch { /* tamamen boş hücre: kırpılamaz */ }
+      if (process.env.ZON_HATA_AYIKLA) require('fs').writeFileSync(`${process.env.ZON_HATA_AYIKLA}/el_${String(++hataAyiklaSayac).padStart(2, '0')}.png`, parca);
+      const r = await elyazisi.oku(parca, 'satir');
+      for (const a of r?.adaylar || (r?.metin ? [r.metin] : [])) if (a.trim()) adaylar.push(a.replace(/\s+/g, ' ').trim());
+    }
+  }
+  const t = await hucreOku(g, k, psm, ekler, true);
+  if (t) adaylar.push(t);
+  return adaylar;
+}
+
+// Hücre bulunamayıp sayfanın büyük kısmı döndüyse geçersiz say
+const hucreMakul = (k, W, H) => (k.x1 - k.x0) < W * 0.45 && (k.y1 - k.y0) < H * 0.25;
 
 function tsvKelimeler(tsv) {
   const satir = tsv.split('\n').slice(1).map(l => l.split('\t')).filter(s => s.length >= 12 && s[11].trim());
@@ -169,7 +199,11 @@ async function bolgeselOku(girdi) {
   const sagHucre = (etiket) => {
     const [mx, my] = merkez(etiket);
     const e = hucre(c, g.W, g.H, mx, my);
-    return hucre(c, g.W, g.H, e.x1 + 10, my);
+    const k = hucreMakul(e, g.W, g.H) ? hucre(c, g.W, g.H, e.x1 + 10, my) : null;
+    if (k && hucreMakul(k, g.W, g.H)) return k;
+    // Çizgiler bulunamadı: etiketin sağındaki yaklaşık bölge (form düzenine göre)
+    const x0 = hucreMakul(e, g.W, g.H) ? e.x1 + 6 : etiket.x + etiket.w + Math.round(g.W * 0.08);
+    return { x0, x1: Math.min(g.W - 1, x0 + Math.round(g.W * 0.27)), y0: Math.max(0, my - Math.round(g.H * 0.03)), y1: Math.min(g.H - 1, my + Math.round(g.H * 0.03)) };
   };
 
   const okumalar = [];
@@ -181,10 +215,20 @@ async function bolgeselOku(girdi) {
   if (tarih) okumalar.push(hucreOku(g, hucre(c, g.W, g.H, ...merkez(tarih))).then(t => { sonuc.tarih = t; }));
 
   // Sağ sütundaki değer hücreleri
-  const plaka = bul(/^plaka/)[0];
-  if (plaka) okumalar.push(hucreOku(g, sagHucre(plaka), 7, PLAKA, true).then(t => { sonuc.plaka = t; }));
-  const surucu = bul(/^suruc/)[0];
-  if (surucu) okumalar.push(hucreOku(g, sagHucre(surucu), 7, [], true).then(t => { sonuc.surucu = t; }));
+  // Etiketler formun üst yarısında aranır (alttaki "Sürücüler ve görevliler…" notu karışmasın)
+  const formda = (k) => k.y < g.H * 0.6;
+  const surucu = bul(/^surucunun|^suruc/, formda).sort((a, b) => a.y - b.y)[0];
+  const surucuHucre = surucu ? sagHucre(surucu) : null;
+  if (surucuHucre) okumalar.push(elAdaylar(g, surucuHucre, 7, []).then(a => { sonuc.surucu = a[0] || ''; sonuc.surucuAdaylar = a; }));
+  const plaka = bul(/^plaka/, formda)[0];
+  let plakaHucre = plaka ? sagHucre(plaka) : null;
+  // "Plakası" etiketi okunamadıysa: sürücü değer hücresinin bir altındaki hücre
+  if (!plakaHucre && surucuHucre) {
+    const alt = hucre(c, g.W, g.H, (surucuHucre.x0 + surucuHucre.x1) / 2, surucuHucre.y1 + 20);
+    plakaHucre = hucreMakul(alt, g.W, g.H) ? alt
+      : { x0: surucuHucre.x0, x1: surucuHucre.x1, y0: surucuHucre.y1, y1: Math.min(g.H - 1, surucuHucre.y1 + (surucuHucre.y1 - surucuHucre.y0)) };
+  }
+  if (plakaHucre) okumalar.push(elAdaylar(g, plakaHucre, 7, PLAKA).then(a => { sonuc.plaka = a[0] || ''; sonuc.plakaAdaylar = a; }));
   const gidecek = bul(/^gidece/)[0];
   if (gidecek) okumalar.push(hucreOku(g, sagHucre(gidecek)).then(t => { sonuc.yer = t; }));
 
@@ -193,8 +237,8 @@ async function bolgeselOku(girdi) {
   const saatOku = async (etiket) => {
     const k = hucre(c, g.W, g.H, ...merkez(etiket));
     const alt = { ...k, y0: etiket.y + etiket.h };
-    const t = await hucreOku(g, alt, 7, RAKAM, true);
-    return saatCoz(t) || saatCoz(await hucreOku(g, alt, 6, RAKAM, true));
+    for (const a of await elAdaylar(g, alt, 7, RAKAM)) { const s_ = saatCoz(a); if (s_) return s_; }
+    return saatCoz(await hucreOku(g, alt, 6, RAKAM, true));
   };
   if (saatler[0]) okumalar.push(saatOku(saatler[0]).then(t => { sonuc.cikis = t; }));
   if (saatler[1]) okumalar.push(saatOku(saatler[1]).then(t => { sonuc.donus = t; }));
@@ -226,7 +270,12 @@ async function bolgeselOku(girdi) {
   // Belge no: tablonun altında, sağ tarafta el yazısı ya da kaşe
   if (tabloAlt) {
     const bolge = { x0: Math.round(g.W * 0.7), x1: g.W - 1, y0: tabloAlt, y1: Math.min(g.H - 1, tabloAlt + Math.round(g.H * 0.25)) };
-    okumalar.push(Promise.all([hucreOku(g, bolge, 11, RAKAM, true), hucreOku(g, bolge, 6, RAKAM, true)]).then(([a, b]) => { sonuc.belgeNo = `${a} ${b}`; }));
+    okumalar.push((async () => {
+      const el = elyazisi.kullanilabilir() ? (await elAdaylar(g, bolge, 11, RAKAM)).slice(0, -1) : [];
+      const [a, b] = await Promise.all([hucreOku(g, bolge, 11, RAKAM, true), hucreOku(g, bolge, 6, RAKAM, true)]);
+      // belgeNoCoz en sık geçen 5-6 haneli sayıyı seçer; PaddleOCR adayları iki kez sayılır
+      sonuc.belgeNo = [...el, ...el, a, b].join(' ');
+    })());
   }
 
   await Promise.all(okumalar);

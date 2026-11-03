@@ -231,6 +231,17 @@
                 </div>
                 <div class="col-12 form-text">Kapalıyken görüntüler sunucuya kaydedilmez: Drive'dan gelenler OCR ve görüntüleme/PDF için her seferinde Drive'dan anlık alınır; elle yüklenenler yalnızca OCR'dan geçer, saklanmaz.</div>
               </div></div>
+              <div class="card card-secondary card-outline mt-3"><div class="card-header"><h3 class="card-title"><i class="bi bi-pen me-1"></i> El yazısı okuma</h3></div><div class="card-body row g-2">
+                <div class="col-md-6">
+                  <label class="form-label small">El yazısı alanlar için motor</label>
+                  <select class="form-select form-select-sm" name="elYazisiMotoru">
+                    <option value="paddle">PaddleOCR (yerel, internetsiz)</option>
+                    <option value="tesseract">Tesseract</option>
+                  </select>
+                </div>
+                <div class="col-md-6 small d-flex align-items-end" id="elyazisiDurum"></div>
+                <div class="col-12 form-text">Sürücü, plaka, saatler ve belge no için kullanılır; basılı alanlar her durumda Tesseract ile okunur. Sonuç yalnızca bilinen kişi/plakayla eşleşir ya da geçerli biçime uyarsa forma yazılır.</div>
+              </div></div>
               <div class="card card-secondary card-outline mt-3"><div class="card-header"><h3 class="card-title">EDYS sayı alanı</h3></div><div class="card-body row g-2">
                 <div class="col-12"><label class="form-label small">Görev emri sayı öneki (OCR tamamlaması için, örn. E-12345678-123.45.67-)</label><input class="form-control form-control-sm" name="sayiOnek"></div>
                 <div class="col-12 small text-body-secondary">Her şablonun EDYS'deki sayı parçasını (td'li ya da p'li hali) buraya yapıştırınız; olduğu gibi başlığa konur. Boş bırakılırsa sayı satırı çıkmaz.</div>

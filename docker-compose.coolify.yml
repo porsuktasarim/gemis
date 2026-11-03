@@ -16,6 +16,10 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+  # El yazısı OCR (PaddleOCR, yerel, internetsiz). İstenmezse bu servis silinebilir; uygulama Tesseract'a döner.
+  ocr-el:
+    build: ./ocr-el
+    restart: unless-stopped
   app:
     build: .
     restart: unless-stopped
@@ -25,6 +29,7 @@ services:
     environment:
       MONGO_URL: mongodb://mongo:27017/gemis
       TZ: Europe/Istanbul
+      OCR_EL_URL: http://ocr-el:8000
       # Google Drive hizmet hesabı anahtarı (JSON içeriği, tek satır). Boşsa Drive özelliği kapalı kalır.
       GOOGLE_SERVICE_ACCOUNT_JSON: ${GOOGLE_SERVICE_ACCOUNT_JSON:-}
       PORT: 1138

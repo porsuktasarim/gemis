@@ -398,6 +398,12 @@ async function ayarlariYukle() {
     return p.join('; ');
   }).join('\n');
   driveDurumYukle();
+  api('/api/sistem').then(d => {
+    const e = d.elyazisi || {};
+    $('#elyazisiDurum').innerHTML = e.acik
+      ? `<span class="text-success"><i class="bi bi-check-circle"></i> Servis çalışıyor: ${esc(e.motor)}</span>`
+      : `<span class="text-danger"><i class="bi bi-x-circle"></i> PaddleOCR servisi ${e.tanimli ? 'yanıt vermiyor' : 'tanımlı değil'}; Tesseract kullanılır.</span>`;
+  }).catch(() => {});
 }
 af.addEventListener('submit', async (e) => {
   e.preventDefault();

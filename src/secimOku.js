@@ -2,11 +2,14 @@
 // Parça tarayıcıda kesilip gönderilir; yalnızca bellekte işlenir, saklanmaz.
 const sharp = require('sharp');
 const { tesseract, adTemizle } = require('./zon');
+const elyazisi = require('./elyazisi');
 const { kisiEslestir, plakaCoz, belgeNoCoz, yerOnIsle, adBicimle, sayiBul } = require('./ocr');
 const { yerAyristir, yerYaz, tarihISO } = require('./util');
 
 const RAKAM = ['-c', 'tessedit_char_whitelist=0123456789:.,'];
 const PLAKA = ['-c', 'tessedit_char_whitelist=ABCDEFGHIJKLMNOPRSTUVYZ0123456789 '];
+
+const EL_ALANLARI = ['plaka', 'surucu', 'cikis', 'donus', 'belgeNo'];
 
 // Alan → Tesseract ayarı
 const ALANLAR = {
@@ -69,8 +72,18 @@ async function secimOku(buf, alan, baglam) {
     await temel.clone().threshold(120).png().toBuffer()
   ].map(p => sharp(p).extend({ top: 20, bottom: 20, left: 20, right: 20, background: '#ffffff' }).png().toBuffer());
   const pngler = await Promise.all(cesitler);
-  const psmler = ayar.psm === 7 ? [7, 6] : [6, 4];
   let ilkHam = '';
+  // El yazısı alanlarında önce PaddleOCR (varsa): aday okumalardan kurala uyan ilki
+  if (EL_ALANLARI.includes(alan) && elyazisi.kullanilabilir()) {
+    const parca = await sharp(buf).grayscale().normalise().png().toBuffer();
+    const r = await elyazisi.oku(parca, 'satir');
+    for (const ham of r?.adaylar || []) {
+      if (!ilkHam) ilkHam = ham;
+      const deger = coz(alan, ham, baglam);
+      if (deger) return { ham, deger, motor: 'PaddleOCR' };
+    }
+  }
+  const psmler = ayar.psm === 7 ? [7, 6] : [6, 4];
   for (const psm of psmler) {
     for (const png of pngler) {
       const ham = (await tesseract(png, psm, ayar.ekler)).trim();

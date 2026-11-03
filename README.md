@@ -14,15 +14,23 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
   - OCR **bölgesel** çalışır. Formdaki tablo çizgileri ve etiketler ("Plakası",
     "Sürücünün Adı Soyadı", "Gideceği Yer", "Çıkış Saati" …) bulunur, her alanın
     değer hücresi ayrı kesilip okunur. Rakam alanlarında yalnızca rakam kabul edilir.
-  - Örnek belgelerde ölçülen doğruluk (10 belge):
+  - El yazısı alanlar (sürücü, plaka, saatler, belge no) ayrı bir servisteki **PaddleOCR** (PP-OCRv4, RapidOCR/ONNX) ile okunur. Servis yereldir, internet gerektirmez.
+  - El yazısı sonuçları yalnızca bilinen bir kişiyle ya da plakayla eşleşirse veya geçerli biçime uyarsa forma yazılır; uymayanlar boş bırakılır.
+  - Örnek belgelerde ölçülen doğruluk (10 belgede doğru okunan):
 
-    | Alan | Doğru |
-    |---|---|
-    | Sayı | 10 |
-    | Görev tarihi | 9 |
-    | Gideceği yer | 9 |
-    | Görevli personel | 9 |
-    | El yazısı alanlar | Tesseract ile okunamıyor |
+    | Alan | Tesseract | + PaddleOCR |
+    |---|---|---|
+    | Sayı | 10 | 10 |
+    | Görev tarihi | 9 | 9 |
+    | Gideceği yer | 9 | 9 |
+    | Görevli personel | 9 | 9 |
+    | Sürücü | 1 | 4 |
+    | Plaka | 0 | 2 |
+    | Çıkış saati | 1 | 3 |
+    | Dönüş saati | 0 | 2 |
+    | Belge no | 0 | 0 |
+
+    El yazısı okumaları hâlâ güvenilir değildir; bazen yanlış değer de çıkar (ör. 08:30 yerine 07:30). Bu yüzden her kayıt kontrol edilmelidir. Okunamayan alanlar "Seçerek oku" ile ya da elle tamamlanır.
   - El yazısı alanlar (sürücü, plaka, saatler, belge no) çoğunlukla okunamaz.
     Bu alanlar formdan girilir; daha önce girilen plaka ve kişiler öneri olarak
     gelir.
@@ -79,6 +87,16 @@ Arayüz [AdminLTE 4](https://adminlte.io/themes/v4/) temasıyla hazırlanmışt�
 - Açık/koyu tema seçimi
 
 AdminLTE, Bootstrap Icons ve OverlayScrollbars npm paketlerinden sunulur. İnternet (CDN) bağlantısı gerekmez.
+
+## Servisler
+
+| Servis | Görev |
+|---|---|
+| `app` | Node.js uygulaması. Tesseract OCR imajın içindedir. |
+| `mongo` | MongoDB veritabanı. |
+| `ocr-el` | El yazısı OCR servisi (Python, PaddleOCR modelleri, ~600 MB imaj). |
+
+`ocr-el` modelleri derleme sırasında pip paketiyle gelir; çalışırken internet gerekmez. Servis istenmezse compose dosyasından çıkarılabilir; uygulama kendiliğinden Tesseract'a döner. Ayarlar → El yazısı okuma bölümünden motor seçilir ve servisin durumu görülür.
 
 ## Kurulum
 
@@ -196,7 +214,11 @@ yalnızca kurulduğu bilgisayardaki Docker birimlerinde tutar.
 
 ```
 src/server.js        API ve statik dosyalar
-src/ocr.js           Tesseract ile okuma ve alan çıkarma
+src/ocr.js           OCR sonuçlarından alan çıkarma ve eşleştirme
+src/zon.js           Bölgesel okuma (tablo çizgileri, etiketler, hücreler)
+src/elyazisi.js      El yazısı OCR servisine bağlantı
+src/secimOku.js      Seçerek oku
+ocr-el/              El yazısı OCR servisi (PaddleOCR / RapidOCR, Python)
 src/util.js          Türkçe metin, tarih, ilçe/mahalle ayrıştırma
 src/icmal/           İcmal HTML/Excel üreticileri
 src/disaktar.js      .xlsx ve PDF üretimi
