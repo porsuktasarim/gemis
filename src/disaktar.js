@@ -63,8 +63,10 @@ async function excelUret(ayar, x) {
     yaz(r, sag, 'KONTROL EDEN', true);
     yaz(r + 2, sol, ayar.personelAd); yaz(r + 3, sol, ayar.personelUnvan);
     yaz(r + 2, sag, ayar.subeMuduruAd); yaz(r + 3, sag, ayar.subeMuduruUnvan);
+    if (!x.ikiImza) {   // ek özel hizmet cetvelinde onaylayan yoktur
     yaz(r + 6, orta, 'ONAYLAYAN', true); yaz(r + 7, orta, '. . / . . /' + new Date().getFullYear());
     yaz(r + 9, orta, ayar.ilMudYrdAd); yaz(r + 10, orta, ayar.ilMudYrdUnvan);
+    }
   }
   return wb.xlsx.writeBuffer();
 }

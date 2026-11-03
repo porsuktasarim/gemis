@@ -92,11 +92,11 @@ function kanonikAd(ham, kisiler, oran = 0.2, ipucu = {}) {
   return { ad: adBicim(ad), unvan, kayitli: false };
 }
 
-// Plaka biçimi: "34 ABC 123"
+// Plaka biçimi: boşluksuz, büyük harf "34ABC123"
 function plakaBicim(p) {
   const t = trUpper(p || '').replace(/[^A-Z0-9ÇĞİÖŞÜ]/g, '');
   const m = /^(\d{2})([A-ZÇĞİÖŞÜ]{1,3})(\d{2,5})$/.exec(t);
-  return m ? `${m[1]} ${m[2]} ${m[3]}` : trUpper(p || '').replace(/\s+/g, ' ').trim();
+  return m ? `${m[1]}${m[2]}${m[3]}` : trUpper(p || '').replace(/\s+/g, '').trim();
 }
 
 module.exports = { UNVANLAR, unvanBul, adUnvanAyir, adBicim, kisiEslestir, kanonikAd, plakaBicim };

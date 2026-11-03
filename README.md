@@ -98,8 +98,13 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
 - **EDYS uyumu**
   - İmza alanları `(@IMZA_1)` personel, `(@IMZA_2)` şube müdürü ve
     `(@IMZA_3)` il müdür yardımcısı olarak kalır.
-  - Sayı alanı için her şablonun kendi `sablon_sayi-…` parçası Ayarlar'a
-    yapıştırılır.
+  - Ek özel hizmet cetvelinde kurum şablonundaki gibi iki imzacı vardır:
+    `(@IMZA_1)` personel ve "Kontrol Eden" `(@IMZA_2)` şube müdürü. Onaylayan yoktur.
+  - Ek özel hizmetin sayı satırı varsayılan olarak kurum şablonundaki
+    `sablon_sayi-` / `editorEvrakSayiAlani` biçimindedir; EDYS evrak sayısını buraya yazar.
+    Diğer şablonların sayı parçası Ayarlar'dan değiştirilebilir.
+- **Plakalar** her yerde boşluksuz ve büyük harfle tutulur (`34ABC2159`).
+  Eski "34 ABC 2159" yazımları açılışta kendiliğinden çevrilir.
 
 ## Arayüz
 

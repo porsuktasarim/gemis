@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
-const { Gorev, Kisi, Ayar, Plaka } = require('./models');
+const { Gorev, Kisi, Ayar, Plaka, SAYI_EKOZEL } = require('./models');
 const { gorevOku } = require('./ocr');
 const { secimOku } = require('./secimOku');
 const { icmalUret, TURLER } = require('./icmal');
@@ -57,6 +57,11 @@ async function ayarGetir() {
     await Ayar.create({ _id: 'ayar', tatiller: varsayilan.tatiller, mahalliDisi: varsayilan.mahalliDisi });
     a = await Ayar.findById('ayar').lean();
   }
+  // Ek özel hizmette eski genel sayı satırı kayıtlıysa kurum şablonundaki satıra çevrilir
+  if (!a.sayiEkOzel || /sablon_sayi-0{8}-/.test(a.sayiEkOzel)) {
+    await Ayar.updateOne({ _id: 'ayar' }, { $set: { sayiEkOzel: SAYI_EKOZEL } });
+    a.sayiEkOzel = SAYI_EKOZEL;
+  }
   elyazisi.ayarla(a.elYazisiMotoru || 'paddle');
   return a;
 }
@@ -66,10 +71,29 @@ async function ilkKurulum() {
   if (!(await Kisi.countDocuments())) await Kisi.insertMany(varsayilan.kisiler);
   await gorevleriOnar(Gorev);
   await kisilerToparla();
+  await plakalarToparla();
   // Plaka listesi ilk kez kuruluyorsa onaylanmış görevlerdeki plakalarla başlar
   if (!(await Plaka.countDocuments())) {
-    const onayli = (await Gorev.distinct('plaka', { onayli: true })).map(plakaBicim).filter(p => /^\d{2} [A-ZÇĞİÖŞÜ]{1,3} \d{2,5}$/.test(p));
+    const onayli = (await Gorev.distinct('plaka', { onayli: true })).map(plakaBicim).filter(p => /^\d{2}[A-ZÇĞİÖŞÜ]{1,3}\d{2,5}$/.test(p));
     if (onayli.length) await Plaka.insertMany([...new Set(onayli)].map(plaka => ({ plaka })), { ordered: false }).catch(() => {});
+  }
+}
+
+// Plaka listesindeki eski "34 ABC 123" yazımlarını boşluksuz biçime çevirir, tekrarları birleştirir
+async function plakalarToparla() {
+  const gruplar = new Map();
+  for (const p of await Plaka.find().lean()) {
+    const yeni = plakaBicim(p.plaka);
+    if (!gruplar.has(yeni)) gruplar.set(yeni, []);
+    gruplar.get(yeni).push(p);
+  }
+  for (const [yeni, liste] of gruplar) {
+    // doğru yazılmış kayıt varsa o tutulur; açıklama boşsa diğerlerinden alınır
+    const tut = liste.find(p => p.plaka === yeni) || liste[0];
+    const aciklama = tut.aciklama || liste.map(p => p.aciklama).find(Boolean) || '';
+    const sil = liste.filter(p => p !== tut).map(p => p._id);
+    if (sil.length) await Plaka.deleteMany({ _id: { $in: sil } });
+    if (tut.plaka !== yeni || (tut.aciklama || '') !== aciklama) await Plaka.updateOne({ _id: tut._id }, { $set: { plaka: yeni, aciklama } });
   }
 }
 
@@ -166,7 +190,7 @@ async function adlariDuzenle(g, unvanlar = {}, ekle = false) {
   }
   if (typeof g.plaka === 'string' && g.plaka) {
     g.plaka = plakaBicim(g.plaka);
-    if (ekle && /^\d{2} [A-ZÇĞİÖŞÜ]{1,3} \d{2,5}$/.test(g.plaka)) await Plaka.updateOne({ plaka: g.plaka }, { $setOnInsert: { plaka: g.plaka } }, { upsert: true });
+    if (ekle && /^\d{2}[A-ZÇĞİÖŞÜ]{1,3}\d{2,5}$/.test(g.plaka)) await Plaka.updateOne({ plaka: g.plaka }, { $setOnInsert: { plaka: g.plaka } }, { upsert: true });
   }
   return g;
 }

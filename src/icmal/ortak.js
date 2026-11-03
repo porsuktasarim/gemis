@@ -36,6 +36,27 @@ const IMZA_HTML = `<table border="0" cellpadding="1" cellspacing="1" style="widt
 	</tbody>
 </table>`;
 
+// Ek özel hizmet cetveli: kurum şablonundaki gibi iki imzacı — @IMZA_1 personel (solda),
+// @IMZA_2 kontrol eden şube müdürü (sağda). Onaylayan yoktur.
+const IMZA_IKILI_HTML = `<table border="0" cellpadding="1" cellspacing="1" style="width:1050px">
+	<tbody>
+		<tr>
+			<td style="text-align:center; width:33%">&nbsp;</td>
+			<td style="width:33%">&nbsp;</td>
+			<td style="text-align:center; width:33%"><span style="font-size:11pt">Kontrol Eden</span></td>
+		</tr>
+		<tr>
+			<td style="text-align:center; width:33%">
+			<div class="sablon_imza_1-">(@IMZA_1)</div>
+			</td>
+			<td style="width:33%">&nbsp;</td>
+			<td style="text-align:center; width:33%">
+			<div class="sablon_imza_2-">(@IMZA_2)</div>
+			</td>
+		</tr>
+	</tbody>
+</table>`;
+
 const ANTET = `<div class="sablon_ust_antet-">
 <table style="text-align:center; width:100%">
 	<tbody>
@@ -78,4 +99,4 @@ function yerSeyyar(ayar, yer) {
 
 const td = (icerik, stil = '') => `<td${stil ? ` style="${stil}"` : ''}>${icerik}</td>`;
 
-module.exports = { IMZA_HTML, ANTET, imzaHtml, mahalliDisiMi, yerEkOzel, yerVirgullu, yerSeyyar, esc, td, trTitle };
+module.exports = { IMZA_HTML, IMZA_IKILI_HTML, ANTET, imzaHtml, mahalliDisiMi, yerEkOzel, yerVirgullu, yerSeyyar, esc, td, trTitle };

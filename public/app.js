@@ -173,6 +173,8 @@ function kisiBilgisiGoster() {
   $('#plakaBilgi').innerHTML = !p ? '' : pk ? `<span class="badge text-bg-light border">listede${pk.aciklama ? ': ' + esc(pk.aciklama) : ''}</span>` : '<span class="badge text-bg-warning">listede yok</span>';
 }
 ['personel', 'surucu', 'plaka'].forEach(n => form[n].addEventListener('input', kisiBilgisiGoster));
+// Plaka boşluksuz ve büyük harfle yazılır (34ABC2159)
+form.plaka.addEventListener('change', () => { form.plaka.value = form.plaka.value.toLocaleUpperCase('tr-TR').replace(/[^0-9A-ZÇĞİÖŞÜ]/g, ''); kisiBilgisiGoster(); });
 
 function formDoldur(g) {
   form._id.value = g._id || '';

@@ -40,6 +40,8 @@ const MdSchema = new mongoose.Schema({ ilce: String, mahalleler: [String], not: 
 
 // EDYS sayı parçası; gerçek şablondaki parça (kendi sablon_sayi-… kimliğiyle) Ayarlar'dan yapıştırılır.
 const SAYI_VARSAYILAN = '<p>SAYI:<span id="sablon_sayi-00000000-0000-0000-0000-000000000000"> &nbsp;</span></p>';
+// Ek özel hizmet cetvelinin kurum şablonundaki sayı satırı; EDYS evrak sayısını bu alana yazar
+const SAYI_EKOZEL = '<p><span style="font-size:11pt"><strong>SAYI:</strong><span class="sablon_sayi-"><span id="editorEvrakSayiAlani">&nbsp;</span></span></span></p>';
 
 const AyarSchema = new mongoose.Schema({
   _id: { type: String, default: 'ayar' },
@@ -62,7 +64,7 @@ const AyarSchema = new mongoose.Schema({
   mesaiBit: { type: String, default: '17:00' },
   puantajKontrolTuru: { type: String, default: 'Mera Kanunu Uyg.' },
   puantajMevzuat: { type: String, default: '4342 sayılı Mera Kanunu' },
-  sayiEkOzel: { type: String, default: SAYI_VARSAYILAN },
+  sayiEkOzel: { type: String, default: SAYI_EKOZEL },
   sayiArac: { type: String, default: SAYI_VARSAYILAN },
   sayiSeyyar: { type: String, default: SAYI_VARSAYILAN },
   tatiller: [TatilSchema],
@@ -73,5 +75,6 @@ module.exports = {
   Gorev: mongoose.model('Gorev', GorevSchema),
   Kisi: mongoose.model('Kisi', KisiSchema),
   Plaka: mongoose.model('Plaka', PlakaSchema),
-  Ayar: mongoose.model('Ayar', AyarSchema)
+  Ayar: mongoose.model('Ayar', AyarSchema),
+  SAYI_EKOZEL
 };

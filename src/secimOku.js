@@ -44,7 +44,7 @@ function coz(alan, ham, baglam) {
     case 'belgeNo': { const m = /\d{6}/.exec(t.replace(/[\s.,:]/g, '')); return m ? m[0] : ''; }
     case 'plaka': {
       const p = plakaCoz(t, bilinenPlakalar);
-      return /^\d{2} [A-Z]{1,3} \d{2,4}$/.test(p) ? p : '';
+      return /^\d{2}[A-Z]{1,3}\d{2,4}$/.test(p) ? p : '';
     }
     case 'tarih': return tarihISO(t.replace(/[,]/g, '.').replace(/\s+/g, ''));
     case 'sayi': return sayiBul(`Sayı ${t}`, sayiOnek) || (/(\d{8})\s*$/.exec(t.replace(/\s+/g, '')) && sayiOnek ? sayiOnek + /(\d{8})\s*$/.exec(t.replace(/\s+/g, ''))[1] : t.replace(/\s+/g, ''));

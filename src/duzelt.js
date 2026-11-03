@@ -2,6 +2,7 @@
 // gelen eksik/yanlış tipli alanlar (mahallesiz yer, metin olarak personel, sayı olarak saat…)
 // uygulamanın herhangi bir yerinde hataya yol açmasın diye her okumada ve açılışta düzeltilir.
 const { saatNormal } = require('./util');
+const { plakaBicim } = require('./kisiler');
 
 const metin = (v) => (v === null || v === undefined ? '' : String(v)).trim();
 
@@ -15,6 +16,7 @@ function gorevDuzelt(g) {
     .filter(y => y.ilce || y.mahalleler.length);
   d.personel = (Array.isArray(d.personel) ? d.personel : d.personel ? [d.personel] : []).map(metin).filter(Boolean);
   for (const k of ['sayi', 'yerHam', 'plaka', 'surucu', 'gorevTuru']) d[k] = metin(d[k]);
+  d.plaka = plakaBicim(d.plaka);   // plakalar boşluksuz: 34ABC2159
   // 5 haneli sayıya dönüşmüş belge no (052290 → 52290) baştaki sıfırını geri alır
   const b = metin(d.belgeNo).replace(/\D/g, '');
   d.belgeNo = b.length === 5 ? `0${b}` : b;

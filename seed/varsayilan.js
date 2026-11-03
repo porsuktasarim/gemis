@@ -57,16 +57,16 @@ const kisiler = [
 // Ayarlar ekranındaki "Örnek veriyi içe aktar" düğmesiyle yüklenir.
 const A = 'Ali YILMAZ', AY = 'Ayşe KAYA', M = 'Mehmet DEMİR', Z = 'Zeynep ŞAHİN', C = 'Can ÖZTÜRK', E = 'Elif AYDIN', MU = 'Murat ÇELİK';
 const ornek = [
-  ['2026-10-06', '101', 'Beykoz-Alibahadır, Sancaktepe-Paşaköy', '34 AAA 001', C, [A, E, C, Z], '08:30', '17:00'],
-  ['2026-10-07', '102', 'Arnavutköy-Yassıören, Çatalca-Subaşı', '34 AAA 001', C, [A, MU, C, E], '09:30', '17:00'],
-  ['2026-10-08', '103', 'Arnavutköy-Yassıören', '34 BBB 002', C, [AY, M, A, C], '09:30', '16:00'],
-  ['2026-10-13', '104', 'Çatalca-Çiftlikköy', '34 CCC 003', A, [AY, M, A], '09:30', '16:00'],
-  ['2026-10-16', '105', 'Üsküdar-Çekmeköy-Ömerli', '34 DDD 004', 'Hakan KOÇ', [M, A, 'Selin ARSLAN'], '10:00', '15:30'],
-  ['2026-10-19', '106', 'Beykoz-Alibahadır', '34 EEE 005', A, [M, AY, A, Z], '09:30', '16:00'],
-  ['2026-10-20', '107', 'Çatalca-Çiftlikköy', '34 FFF 006', A, [AY, Z, A, M], '09:00', '15:30'],
-  ['2026-10-23', '108', 'Büyükçekmece-Tepecik, Bağcılar, Güngören', '34 FFF 006', MU, [AY, M, A, Z], '09:30', '17:00'],
-  ['2026-10-26', '109', 'B.Çekmece-Ahmediye, Sarıyer-Demirciköy', '34 GGG 007', 'Emre KURT', [AY, Z, A, M], '09:30', '14:00'],
-  ['2026-10-27', '110', 'Şile-Doğancılı', '34 HHH 008', A, [AY, M, Z, A], '10:00', '15:00']
+  ['2026-10-06', '101', 'Beykoz-Alibahadır, Sancaktepe-Paşaköy', '34AAA001', C, [A, E, C, Z], '08:30', '17:00'],
+  ['2026-10-07', '102', 'Arnavutköy-Yassıören, Çatalca-Subaşı', '34AAA001', C, [A, MU, C, E], '09:30', '17:00'],
+  ['2026-10-08', '103', 'Arnavutköy-Yassıören', '34BBB002', C, [AY, M, A, C], '09:30', '16:00'],
+  ['2026-10-13', '104', 'Çatalca-Çiftlikköy', '34CCC003', A, [AY, M, A], '09:30', '16:00'],
+  ['2026-10-16', '105', 'Üsküdar-Çekmeköy-Ömerli', '34DDD004', 'Hakan KOÇ', [M, A, 'Selin ARSLAN'], '10:00', '15:30'],
+  ['2026-10-19', '106', 'Beykoz-Alibahadır', '34EEE005', A, [M, AY, A, Z], '09:30', '16:00'],
+  ['2026-10-20', '107', 'Çatalca-Çiftlikköy', '34FFF006', A, [AY, Z, A, M], '09:00', '15:30'],
+  ['2026-10-23', '108', 'Büyükçekmece-Tepecik, Bağcılar, Güngören', '34FFF006', MU, [AY, M, A, Z], '09:30', '17:00'],
+  ['2026-10-26', '109', 'B.Çekmece-Ahmediye, Sarıyer-Demirciköy', '34GGG007', 'Emre KURT', [AY, Z, A, M], '09:30', '14:00'],
+  ['2026-10-27', '110', 'Şile-Doğancılı', '34HHH008', A, [AY, M, Z, A], '10:00', '15:00']
 ].map(([tarih, no, yerHam, plaka, surucu, personel, cikis, donus]) => ({
   tarih, sayi: `E-00000000-000.00.00-00000${no}`, belgeNo: `000${no}`,
   yerHam, plaka, surucu, personel, cikis, donus, onayli: true

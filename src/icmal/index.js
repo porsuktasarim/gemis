@@ -1,6 +1,6 @@
 // İcmal üreticileri. Her biri { baslik, html, excel, gorevler, uyarilar } döndürür.
 // excel: { baslik, bilgi:[[etiket, değer]], basliklar:[...], satirlar:[[...]], genislik:[...], dipnot }
-const { ANTET, imzaHtml, yerEkOzel, yerVirgullu, yerSeyyar, esc } = require('./ortak');
+const { ANTET, imzaHtml, IMZA_IKILI_HTML, yerEkOzel, yerVirgullu, yerSeyyar, esc } = require('./ortak');
 const { tarihTR, dk, saatYaz, ayGunleri, aylar, ayAraligiMetni, plakaBosluksuz, yerYaz, trUpper, sade } = require('../util');
 
 const TURLER = {
@@ -139,7 +139,7 @@ ${PUANTAJ_DIPNOT}
 // ---------------- EK ÖZEL HİZMET ----------------
 function ekozel(ayar, gorevler, { bas, bit }) {
   const donem = trUpper(ayAraligiMetni(bas, bit)).replace(/ (\d{4})$/, ' - $1');
-  const satirlar = gorevler.map(g => { const y = yerEkOzel(g.yer); return [tarihTR(g.tarih), g.plaka || '', y.ilce, y.mahalle, g.gorevTuru]; });
+  const satirlar = gorevler.map(g => { const y = yerEkOzel(g.yer); return [tarihTR(g.tarih), plakaBosluksuz(g.plaka), y.ilce, y.mahalle, (g.gorevTuru || '').replace(/^\d+\s+sayılı\s+/i, '')]; });
   const satirHtml = satirlar.map(([t, p, i, m, k], n) => `		<tr>
 			<td style="text-align:center">${n + 1}</td>
 			<td style="text-align:center; width:81px">${t}</td>
@@ -199,7 +199,7 @@ ${satirHtml}
 
 <p>&nbsp;</p>
 
-${imzaHtml(bit.slice(0, 4))}
+${IMZA_IKILI_HTML}
 `;
   return {
     baslik: `Ek Özel Hizmet ${ayAraligiMetni(bas, bit)} - ${ayar.personelAd}`,
@@ -209,7 +209,8 @@ ${imzaHtml(bit.slice(0, 4))}
       bilgi: [['AYI - YIL', donem], ['ŞUBESİ', ayar.sube], ['PERSONELİN ADI SOYADI', ayar.personelAd], ['ÜNVANI', ayar.personelUnvanCetvel]],
       basliklar: ['SIRA NO', 'TARİHİ', "GÖREVE GİDİLEN ARACIN PLAKA NO'SU", 'İLÇE', 'KÖY/MAHALLE', 'GÖREVİN KONUSU', 'AÇIKLAMALAR'],
       satirlar: satirlar.map((s, i) => [i + 1, ...s, '']),
-      genislik: [8, 12, 16, 30, 34, 28, 14]
+      genislik: [8, 12, 16, 30, 34, 28, 14],
+      ikiImza: true
     },
     gorevler,
     uyarilar: genelUyarilar(gorevler)
@@ -343,7 +344,7 @@ function liste(ayar, gorevler, { bas, bit, tumKisiler }) {
   const sat = [];
   const kisiMi = (a) => tumKisiler || sade(a) === sade(ayar.personelAd);
   for (const g of gorevler) {
-    const ortak = [tarihTR(g.tarih), yerYaz(g.yer) || g.yerHam || '', g.plaka || '', g.cikis || '', g.donus || '', g.belgeNo || ''];
+    const ortak = [tarihTR(g.tarih), yerYaz(g.yer) || g.yerHam || '', plakaBosluksuz(g.plaka), g.cikis || '', g.donus || '', g.belgeNo || ''];
     if (g.surucu && kisiMi(g.surucu)) sat.push([g.surucu, 'Sürücü', g.tarih, ...ortak]);
     for (const p of g.personel || []) if (kisiMi(p)) sat.push([p, 'Görevli Personel', g.tarih, ...ortak]);
   }

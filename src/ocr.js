@@ -127,7 +127,7 @@ function yerBul(metin, haricKelimeler, bilinenMahalleler) {
 
 function plakaBul(metin) {
   const m = /\b(34|16|35|06)\s?([A-ZÇĞİÖŞÜ]{1,3})\s?(\d{2,4})\b/.exec(metin.replace(/plakas[ıi]/gi, ' '));
-  return m ? `${m[1]} ${m[2]} ${m[3]}` : '';
+  return m ? `${m[1]}${m[2]}${m[3]}` : '';
 }
 
 function belgeNoBul(metin) {
@@ -156,7 +156,7 @@ function plakaCoz(ham, bilinen = []) {
   // Rakam bölümünde el yazısında sık karışan harfler rakama çevrilir (Z→2, O→0, S→5, B→8, G→6, I→1)
   const RAKAMA = { O: '0', D: '0', Q: '0', I: '1', L: '1', Z: '2', S: '5', G: '6', B: '8' };
   const m = /(\d{2})\s*([A-Z]{1,3})\s*([0-9ODQILZSGB]{2,4})(?![0-9])/.exec(t);
-  const aday = m ? `${m[1]} ${m[2]} ${m[3].replace(/[ODQILZSGB]/g, h => RAKAMA[h])}` : '';
+  const aday = m ? `${m[1]}${m[2]}${m[3].replace(/[ODQILZSGB]/g, h => RAKAMA[h])}` : '';
   // Daha önce girilen plakalarla karşılaştır (el yazısı hatalarını düzeltir)
   const sik = sade(aday || t);
   if (sik.length >= 5) {
@@ -221,7 +221,7 @@ async function gorevOku(girdi, orijinalAd, baglam) {
     surucu: ilkGecerli(z.surucuAdaylar || [z.surucu], a => kisiEslestir(a, kisiler, 0.35, {
       tercih: new Set([...personel, ...kisiler.filter(k => /şoför|sofor/i.test(k.unvan || '')).map(k => k.ad)])
     })),
-    plaka: ilkGecerli(z.plakaAdaylar || [z.plaka], a => { const p = plakaCoz(a, bilinenPlakalar); return /^\d{2} [A-Z]{1,3} \d{2,4}$/.test(p) ? p : ''; }) || plakaBul(metin),
+    plaka: ilkGecerli(z.plakaAdaylar || [z.plaka], a => { const p = plakaCoz(a, bilinenPlakalar); return /^\d{2}[A-Z]{1,3}\d{2,4}$/.test(p) ? p : ''; }) || plakaBul(metin),
     belgeNo: belgeNoCoz(z.belgeNo),
     cikis: z.cikis || saat.cikis,
     donus: z.donus || saat.donus
