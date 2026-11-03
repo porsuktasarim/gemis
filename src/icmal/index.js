@@ -1,6 +1,7 @@
 // İcmal üreticileri. Her biri { baslik, html, excel, gorevler, uyarilar } döndürür.
 // excel: { baslik, bilgi:[[etiket, değer]], basliklar:[...], satirlar:[[...]], genislik:[...], dipnot }
-const { ANTET, imzaHtml, IMZA_IKILI_HTML, yerEkOzel, yerVirgullu, yerSeyyar, esc } = require('./ortak');
+const { ANTET, yerEkOzel, yerVirgullu, yerSeyyar, esc } = require('./ortak');
+const { sablonGetir, yilKoy, imzaCoz, SABLON_TURLERI } = require('./sablon');
 const { tarihTR, dk, saatYaz, ayGunleri, aylar, ayAraligiMetni, plakaBosluksuz, yerYaz, trUpper, sade } = require('../util');
 
 const TURLER = {
@@ -76,6 +77,8 @@ ${ANTET}
 
 <p>&nbsp;</p>
 
+${sablonGetir(ayar, 'puantaj').sayi}
+
 <p style="text-align:center"><strong>Kontrol Hizmetlerine İlişkin Puantaj Tablosu (EK-1)&nbsp;</strong></p>
 
 <p style="text-align:center"><strong>Ait Olduğu Yıl: </strong>${yil}<strong>&nbsp;Ay: </strong>${AY}</p>
@@ -112,7 +115,7 @@ ${satirHtml}
 
 <p><span style="font-size:9pt">*Ek Özel Hizmet Tazminatına eklendi.&nbsp;</span></p>
 
-${imzaHtml(yil)}
+${yilKoy(sablonGetir(ayar, 'puantaj').imza, yil)}
 
 <p>&nbsp;</p>
 
@@ -159,7 +162,7 @@ function ekozel(ayar, gorevler, { bas, bit }) {
 	<tbody>
 		<tr>
 			<td colspan="9" style="height:10pt; vertical-align:bottom; white-space:nowrap; width:93px">
-			${ayar.sayiEkOzel || ''}
+			${sablonGetir(ayar, 'ekozel').sayi}
 
 			<p><span style="font-size:11pt"><strong>AYI - YIL:</strong>&nbsp;${esc(donem)}</span></p>
 			</td>
@@ -199,7 +202,7 @@ ${satirHtml}
 
 <p>&nbsp;</p>
 
-${IMZA_IKILI_HTML}
+${yilKoy(sablonGetir(ayar, 'ekozel').imza, bit.slice(0, 4))}
 `;
   return {
     baslik: `Ek Özel Hizmet ${ayAraligiMetni(bas, bit)} - ${ayar.personelAd}`,
@@ -209,8 +212,7 @@ ${IMZA_IKILI_HTML}
       bilgi: [['AYI - YIL', donem], ['ŞUBESİ', ayar.sube], ['PERSONELİN ADI SOYADI', ayar.personelAd], ['ÜNVANI', ayar.personelUnvanCetvel]],
       basliklar: ['SIRA NO', 'TARİHİ', "GÖREVE GİDİLEN ARACIN PLAKA NO'SU", 'İLÇE', 'KÖY/MAHALLE', 'GÖREVİN KONUSU', 'AÇIKLAMALAR'],
       satirlar: satirlar.map((s, i) => [i + 1, ...s, '']),
-      genislik: [8, 12, 16, 30, 34, 28, 14],
-      ikiImza: true
+      genislik: [8, 12, 16, 30, 34, 28, 14]
     },
     gorevler,
     uyarilar: genelUyarilar(gorevler)
@@ -218,7 +220,7 @@ ${IMZA_IKILI_HTML}
 }
 
 // ---------------- ARAÇ KULLANMA / SEYYAR (aynı şablon) ----------------
-function aracSablonu(ayar, { baslikMetni, donem, sayiHtml, unvan, satirlar, yil }) {
+function aracSablonu(ayar, { baslikMetni, donem, sayiHtml, imzaHtml, unvan, satirlar, yil }) {
   const satirHtml = satirlar.map(([t, p, i, m, k], n) => `		<tr>
 			<td style="width:45px"><span style="font-size:10pt">${n + 1}</span></td>
 			<td style="text-align:center; width:77px"><span style="font-size:10pt">${t}</span></td>
@@ -281,7 +283,7 @@ ${satirHtml}
 	</tbody>
 </table>
 
-${imzaHtml(yil)}
+${yilKoy(imzaHtml, yil)}
 
 <p>&nbsp;</p>
 `;
@@ -306,7 +308,7 @@ function arac(ayar, gorevler, { bas, bit }) {
     baslik: `Araç Kullanma ${donem} - ${ayar.personelAd}`,
     html: aracSablonu(ayar, {
       baslikMetni: 'GÖREVLERİNİ ARAÇ KULLANARAK YERİNE GETİREN KAMU GÖREVLİLERİNE İLAVE ÜCRET&nbsp;GERÇEKLEŞME CETVELİ&nbsp;',
-      donem: esc(donem).replace(/ (\d{4})$/, '&nbsp;$1'), sayiHtml: ayar.sayiArac, unvan: ayar.personelUnvanCetvel, satirlar, yil: bit.slice(0, 4)
+      donem: esc(donem).replace(/ (\d{4})$/, '&nbsp;$1'), sayiHtml: sablonGetir(ayar, 'arac').sayi, imzaHtml: sablonGetir(ayar, 'arac').imza, unvan: ayar.personelUnvanCetvel, satirlar, yil: bit.slice(0, 4)
     }),
     excel: aracExcel(ayar, baslik, donem, ayar.personelUnvanCetvel, satirlar),
     gorevler: kendi,
@@ -331,7 +333,7 @@ function seyyar(ayar, gorevler, { bas, bit, donemMetni }) {
     baslik: `Seyyar Görev ${donem} - ${ayar.personelAd}`,
     html: aracSablonu(ayar, {
       baslikMetni: 'SEYYAR GÖREV TAZMİNATINA ESAS AYLIK ARAZİ ÇIKIŞ CETVELİ&nbsp;',
-      donem: esc(donem), sayiHtml: ayar.sayiSeyyar, unvan: ayar.personelUnvanSeyyar, satirlar, yil: bit.slice(0, 4)
+      donem: esc(donem), sayiHtml: sablonGetir(ayar, 'seyyar').sayi, imzaHtml: sablonGetir(ayar, 'seyyar').imza, unvan: ayar.personelUnvanSeyyar, satirlar, yil: bit.slice(0, 4)
     }),
     excel: aracExcel(ayar, 'Seyyar Görev Tazminatına Esas Aylık Arazi Çıkış Cetveli', donem, ayar.personelUnvanSeyyar, satirlar),
     gorevler: uygun,
@@ -422,7 +424,13 @@ function icmalUret(tur, ayar, gorevler, secenek) {
   const ad = sade(ayar.personelAd);
   const kapsam = (tumu ? ayaGore : ayaGore.filter(g => sade(g.surucu) === ad || (g.personel || []).some(p => sade(p) === ad)))
     .sort((a, b) => a.tarih.localeCompare(b.tarih));
-  return f(ayar, kapsam, secenek);
+  const icmal = f(ayar, kapsam, secenek);
+  // Excel'in imza kısmı türün imza bloğundan çıkarılır (imzacı sayısı ve yerleri evraka göre değişir)
+  if (SABLON_TURLERI.includes(tur) && icmal.excel && !icmal.excel.imzasiz) {
+    icmal.excel.imzalar = imzaCoz(sablonGetir(ayar, tur).imza);
+    icmal.excel.yil = secenek.bit.slice(0, 4);
+  }
+  return icmal;
 }
 
 module.exports = { TURLER, icmalUret };

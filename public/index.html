@@ -240,11 +240,20 @@
                 <div class="col-md-6 small d-flex align-items-end" id="elyazisiDurum"></div>
                 <div class="col-12 form-text">Sürücü, plaka, saatler ve belge no için kullanılır; basılı alanlar her durumda Tesseract ile okunur. Sonuç yalnızca bilinen kişi/plakayla eşleşir ya da geçerli biçime uyarsa forma yazılır.</div>
               </div></div>
-              <div class="card card-secondary card-outline mt-3"><div class="card-header"><h3 class="card-title">EDYS sayı alanı</h3></div><div class="card-body row g-2">
-                <div class="col-12 small text-body-secondary">Her şablonun EDYS'deki sayı parçasını (td'li ya da p'li hali) buraya yapıştırınız; olduğu gibi başlığa konur. Boş bırakılırsa sayı satırı çıkmaz.</div>
-                <div class="col-12"><label class="form-label small">Ek özel hizmet</label><textarea class="form-control form-control-sm font-monospace" name="sayiEkOzel" rows="2"></textarea></div>
-                <div class="col-12"><label class="form-label small">Araç kullanma</label><textarea class="form-control form-control-sm font-monospace" name="sayiArac" rows="2"></textarea></div>
-                <div class="col-12"><label class="form-label small">Seyyar görev</label><textarea class="form-control form-control-sm font-monospace" name="sayiSeyyar" rows="2"></textarea></div>
+              <div class="card card-secondary card-outline mt-3"><div class="card-header"><h3 class="card-title">Belge şablonları (EDYS)</h3></div><div class="card-body row g-2">
+                <div class="col-12 small text-body-secondary">Her evrakın sayı satırı ve imza bloğu farklı olabilir. Kurum şablonundaki parçayı (EDYS kaynak görünümünden, <code>(@IMZA_1)</code> gibi alanların doldurulmamış hâliyle) ilgili kutuya yapıştırınız; çıktıya olduğu gibi konur. Kutu boş bırakılırsa o parça çıkmaz.</div>
+                <div class="col-md-6"><label class="form-label small mb-0">İcmal</label>
+                  <select class="form-select form-select-sm" id="sablonTur">
+                    <option value="ekozel">Ek özel hizmet</option>
+                    <option value="arac">Araç kullanma</option>
+                    <option value="seyyar">Seyyar görev</option>
+                    <option value="puantaj">Puantaj (EK-1)</option>
+                  </select></div>
+                <div class="col-md-6 d-flex align-items-end"><button type="button" class="btn btn-outline-secondary btn-sm" id="sablonVarsayilan"><i class="bi bi-arrow-counterclockwise"></i> Bu icmali varsayılana döndür</button></div>
+                <div class="col-12"><label class="form-label small mb-0">Sayı satırı</label><textarea class="form-control form-control-sm font-monospace" id="sablonSayi" rows="3"></textarea></div>
+                <div class="col-12"><label class="form-label small mb-0">İmza bloğu</label><textarea class="form-control form-control-sm font-monospace" id="sablonImza" rows="8"></textarea>
+                  <div class="form-text" id="sablonImzacilar"></div></div>
+                <div class="col-12 form-text">Excel çıktısının imza kısmı imza bloğundan çıkarılır: (@IMZA_1) personel, (@IMZA_2) şube müdürü, (@IMZA_3) il müdür yardımcısı ünvanıyla yazılır. Değişiklikler "Kaydet" ile saklanır.</div>
               </div></div>
               <div class="card card-secondary card-outline mt-3"><div class="card-header"><h3 class="card-title">Seyyar görev – mahalli dışı yerler</h3></div><div class="card-body">
                 <label class="form-label small">Her satıra: İlçe: Mahalle1, Mahalle2, …</label>

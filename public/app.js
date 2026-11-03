@@ -458,8 +458,45 @@ $('#kopyalaTablo').addEventListener('click', async () => {
 
 // ---------- Ayarlar ----------
 const af = $('#ayarForm');
+
+// Belge şablonları: türe göre sayı satırı ve imza bloğu. Seçili türün kutuları değiştikçe bellekteki
+// nesneye yazılır; "Kaydet" ile ayarlarla birlikte saklanır.
+let sablonlar = {}, sablonVarsayilan = {};
+const sablonTurSec = $('#sablonTur');
+function sablonGetirIstemci(tur) {
+  const v = sablonVarsayilan[tur] || { sayi: '', imza: '' }, k = sablonlar[tur] || {};
+  return { sayi: typeof k.sayi === 'string' ? k.sayi : v.sayi, imza: typeof k.imza === 'string' ? k.imza : v.imza };
+}
+let imzaZaman;
+function imzacilariGoster() {
+  clearTimeout(imzaZaman);
+  imzaZaman = setTimeout(async () => {
+    const IMZACI = { 1: 'personel', 2: 'şube müdürü', 3: 'il müdür yardımcısı' };
+    try {
+      const l = await api('/api/imza-coz', { method: 'POST', body: JSON.stringify({ html: $('#sablonImza').value }) });
+      $('#sablonImzacilar').innerHTML = l.length
+        ? `Algılanan imzacılar (${l.length}): ` + l.map(s => `<span class="badge text-bg-light border">${[`@IMZA_${s.no}`, IMZACI[s.no], s.etiket && '– ' + s.etiket].filter(Boolean).map(esc).join(' ')}</span>`).join(' ')
+        : '<span class="text-warning">İmza alanı bulunamadı; çıktıda imza kısmı olmaz.</span>';
+    } catch { $('#sablonImzacilar').textContent = ''; }
+  }, 300);
+}
+function sablonKutulariDoldur() {
+  const s = sablonGetirIstemci(sablonTurSec.value);
+  $('#sablonSayi').value = s.sayi; $('#sablonImza').value = s.imza;
+  imzacilariGoster();
+}
+function sablonKutulariAl() {
+  sablonlar[sablonTurSec.value] = { sayi: $('#sablonSayi').value, imza: $('#sablonImza').value };
+}
+$('#sablonSayi').addEventListener('input', sablonKutulariAl);
+$('#sablonImza').addEventListener('input', () => { sablonKutulariAl(); imzacilariGoster(); });
+sablonTurSec.addEventListener('change', sablonKutulariDoldur);
+$('#sablonVarsayilan').addEventListener('click', () => { delete sablonlar[sablonTurSec.value]; sablonKutulariDoldur(); });
+
 async function ayarlariYukle() {
-  const [a, kisiler, plakalar] = await Promise.all([api('/api/ayarlar'), api('/api/kisiler'), api('/api/plakalar')]);
+  const [a, kisiler, plakalar, sv] = await Promise.all([api('/api/ayarlar'), api('/api/kisiler'), api('/api/plakalar'), api('/api/sablon-varsayilan')]);
+  sablonVarsayilan = sv; sablonlar = JSON.parse(JSON.stringify(a.sablonlar || {}));
+  sablonKutulariDoldur();
   $('#plakalarAlan').value = plakalar.map(p => [p.plaka, p.aciklama].filter(Boolean).join('; ')).join('\n');
   for (const el of af.elements) {
     if (!el.name || el.name === 'tatiller' || el.name === 'mahalliDisi') continue;
@@ -487,6 +524,7 @@ af.addEventListener('submit', async (e) => {
   const veri = {};
   for (const el of af.elements) if (el.name && el.name !== 'tatiller' && el.name !== 'mahalliDisi') veri[el.name] = el.type === 'checkbox' ? el.checked : el.value;
   veri.driveOtoTaraDk = Number(veri.driveOtoTaraDk) || 0;
+  veri.sablonlar = sablonlar;
   veri.ocrHaricAdlar = af.ocrHaricAdlar.value.split(',').map(s => s.trim()).filter(Boolean);
   veri.tatiller = af.tatiller.value.split('\n').map(s => s.split(';').map(x => x.trim())).filter(p => tarihISO(p[0]))
     .map(p => ({ tarih: tarihISO(p[0]), ad: p[1] || '', yarim: /yar[ıi]m/i.test(p[2] || '') }));

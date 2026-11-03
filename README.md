@@ -96,13 +96,17 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
   - .xlsx ve .html indirme
   - Görev emri görüntülerinin PDF'i
 - **EDYS uyumu**
-  - İmza alanları `(@IMZA_1)` personel, `(@IMZA_2)` şube müdürü ve
-    `(@IMZA_3)` il müdür yardımcısı olarak kalır.
-  - Ek özel hizmet cetvelinde kurum şablonundaki gibi iki imzacı vardır:
-    `(@IMZA_1)` personel ve "Kontrol Eden" `(@IMZA_2)` şube müdürü. Onaylayan yoktur.
-  - Ek özel hizmetin sayı satırı varsayılan olarak kurum şablonundaki
-    `sablon_sayi-` / `editorEvrakSayiAlani` biçimindedir; EDYS evrak sayısını buraya yazar.
-    Diğer şablonların sayı parçası Ayarlar'dan değiştirilebilir.
+  - Her icmal türünün (puantaj, ek özel hizmet, araç kullanma, seyyar görev) **sayı satırı**
+    ve **imza bloğu** Ayarlar → *Belge şablonları* bölümünden ayrı ayrı tanımlanır. Kurum
+    şablonundaki parça, `(@IMZA_n)` alanlarının doldurulmamış hâliyle yapıştırılır ve
+    çıktıya olduğu gibi konur. Böylece imzacı sayısı, sırası ve sayı satırının biçimi
+    evraktan evraka farklı olabilir.
+  - Varsayılanlar: ek özel hizmette iki imzacı (personel, "Kontrol Eden" şube müdürü);
+    araç kullanma, seyyar görev ve puantajda üç imzacı (personel, Kontrol Eden, Onaylayan).
+  - Excel çıktısının imza kısmı imza bloğundan çıkarılır: kaç imzacı olduğu, hangi
+    sütunda durdukları ve başlıkları (KONTROL EDEN, ONAYLAYAN…) bloktan okunur.
+    `(@IMZA_1)` personel, `(@IMZA_2)` şube müdürü, `(@IMZA_3)` il müdür yardımcısı
+    ünvanıyla yazılır.
 - **Plakalar** her yerde boşluksuz ve büyük harfle tutulur (`34ABC2159`).
   Eski "34 ABC 2159" yazımları açılışta kendiliğinden çevrilir.
 

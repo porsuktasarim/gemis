@@ -5,7 +5,8 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
-const { Gorev, Kisi, Ayar, Plaka, SAYI_EKOZEL } = require('./models');
+const { Gorev, Kisi, Ayar, Plaka } = require('./models');
+const { VARSAYILAN: SABLON_VARSAYILAN, ESKI_SAYI, imzaCoz } = require('./icmal/sablon');
 const { gorevOku } = require('./ocr');
 const { secimOku } = require('./secimOku');
 const { icmalUret, TURLER } = require('./icmal');
@@ -57,10 +58,17 @@ async function ayarGetir() {
     await Ayar.create({ _id: 'ayar', tatiller: varsayilan.tatiller, mahalliDisi: varsayilan.mahalliDisi });
     a = await Ayar.findById('ayar').lean();
   }
-  // Ek özel hizmette eski genel sayı satırı kayıtlıysa kurum şablonundaki satıra çevrilir
-  if (!a.sayiEkOzel || /sablon_sayi-0{8}-/.test(a.sayiEkOzel)) {
-    await Ayar.updateOne({ _id: 'ayar' }, { $set: { sayiEkOzel: SAYI_EKOZEL } });
-    a.sayiEkOzel = SAYI_EKOZEL;
+  // Eski sürümlerde ayrı alanlarda tutulan sayı parçaları belge şablonlarına taşınır.
+  // Eski genel parça (kimliği sıfırlardan oluşan) taşınmaz; yerine türün varsayılanı kullanılır.
+  const eski = { ekozel: 'sayiEkOzel', arac: 'sayiArac', seyyar: 'sayiSeyyar' };
+  if (Object.values(eski).some(k => k in a)) {
+    const sablonlar = { ...(a.sablonlar || {}) };
+    for (const [tur, k] of Object.entries(eski)) {
+      const v = a[k];
+      if (typeof v === 'string' && v.trim() && !ESKI_SAYI.test(v) && typeof sablonlar[tur]?.sayi !== 'string') sablonlar[tur] = { ...(sablonlar[tur] || {}), sayi: v };
+    }
+    await Ayar.updateOne({ _id: 'ayar' }, { $set: { sablonlar }, $unset: { sayiEkOzel: 1, sayiArac: 1, sayiSeyyar: 1 } });
+    a.sablonlar = sablonlar; delete a.sayiEkOzel; delete a.sayiArac; delete a.sayiSeyyar;
   }
   elyazisi.ayarla(a.elYazisiMotoru || 'paddle');
   return a;
@@ -454,6 +462,9 @@ setInterval(async () => {
 
 // ---------- Ayarlar / Kişiler ----------
 app.get('/api/ayarlar', hata(async (req, res) => res.json(await ayarGetir())));
+// Belge şablonlarının varsayılanları ve imza bloğundan algılanan imzacılar (Ayarlar ekranı için)
+app.get('/api/sablon-varsayilan', (req, res) => res.json(SABLON_VARSAYILAN));
+app.post('/api/imza-coz', (req, res) => res.json(imzaCoz(String(req.body?.html || ''))));
 app.put('/api/ayarlar', hata(async (req, res) => {
   const b = { ...req.body }; delete b._id; delete b.__v;
   res.json(await Ayar.findByIdAndUpdate('ayar', b, { new: true, upsert: true }));

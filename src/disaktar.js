@@ -2,6 +2,7 @@
 const ExcelJS = require('exceljs');
 const { PDFDocument } = require('pdf-lib');
 const sharp = require('sharp');
+const { imzaciBilgisi } = require('./icmal/sablon');
 
 const ince = { style: 'thin', color: { argb: 'FF808080' } };
 const kenar = { top: ince, left: ince, bottom: ince, right: ince };
@@ -56,16 +57,24 @@ async function excelUret(ayar, x) {
 
   if (x.dipnot) { r++; Object.assign(ws.getCell(r, 1), { value: x.dipnot, font: { ...font, size: 9 } }); r++; }
 
-  if (!x.imzasiz) {
+  if (!x.imzasiz && x.imzalar?.length) {
+    // İmza kısmı icmal türünün imza bloğundan çıkarılır: her imzacı bloktaki sütununa yazılır,
+    // bloktaki her satır Excel'de ayrı bir imza grubu olur (başlık, gerekiyorsa tarih, ad, ünvan).
     r += 2;
-    const sol = 1, orta = Math.max(2, Math.ceil(n / 2)), sag = n;
     const yaz = (row, col, v, bold) => Object.assign(ws.getCell(row, col), { value: v, font: { ...font, bold: !!bold }, alignment: { horizontal: 'center' } });
-    yaz(r, sag, 'KONTROL EDEN', true);
-    yaz(r + 2, sol, ayar.personelAd); yaz(r + 3, sol, ayar.personelUnvan);
-    yaz(r + 2, sag, ayar.subeMuduruAd); yaz(r + 3, sag, ayar.subeMuduruUnvan);
-    if (!x.ikiImza) {   // ek özel hizmet cetvelinde onaylayan yoktur
-    yaz(r + 6, orta, 'ONAYLAYAN', true); yaz(r + 7, orta, '. . / . . /' + new Date().getFullYear());
-    yaz(r + 9, orta, ayar.ilMudYrdAd); yaz(r + 10, orta, ayar.ilMudYrdUnvan);
+    const sutunu = (s) => s.sutunSayisi <= 1 ? 1 : Math.round((s.sutun / (s.sutunSayisi - 1)) * (n - 1)) + 1;
+    const gruplar = [...new Set(x.imzalar.map(s => s.satir))];
+    for (const g of gruplar) {
+      const grup = x.imzalar.filter(s => s.satir === g);
+      const tarihli = grup.some(s => s.tarihli);
+      for (const s of grup) {
+        const c = sutunu(s);
+        const [ad, unvan] = imzaciBilgisi(ayar, s.no);
+        if (s.etiket) yaz(r, c, s.etiket, true);
+        if (s.tarihli) yaz(r + 1, c, '. . / . . /' + (x.yil || new Date().getFullYear()));
+        yaz(r + (tarihli ? 3 : 2), c, ad); yaz(r + (tarihli ? 4 : 3), c, unvan);
+      }
+      r += tarihli ? 7 : 6;
     }
   }
   return wb.xlsx.writeBuffer();
