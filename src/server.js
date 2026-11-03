@@ -7,6 +7,7 @@ const crypto = require('crypto');
 
 const { Gorev, Kisi, Ayar } = require('./models');
 const { gorevOku } = require('./ocr');
+const { secimOku } = require('./secimOku');
 const { icmalUret, TURLER } = require('./icmal');
 const { excelUret, pdfUret } = require('./disaktar');
 const { yerAyristir, saatNormal } = require('./util');
@@ -116,11 +117,18 @@ const OCR_ALANLARI = ['tarih', 'sayi', 'belgeNo', 'yerHam', 'yer', 'plaka', 'sur
 const dolu = (v) => Array.isArray(v) ? v.length > 0 : !!v;
 
 async function kaydaIsle(okunan, gorselAlanlari) {
-  // Bu sürümden önce içe aktarılan örnek kayıtlar işaretsiz olabilir; uydurma sayı öneklerinden tanınır
-  const gercek = { ornek: { $ne: true }, sayi: { $not: /^E-00000000-/ } };
-  let kayit = okunan.sayi ? await Gorev.findOne({ sayi: okunan.sayi, ...gercek }) : null;
+  // Örnek kayıtlar hariç. Bu sürümden önce içe aktarılan örnekler işaretsiz olabilir; uydurma sayı önekinden tanınır.
+  // Not: koşullar $and ile birleştirilir; aynı alanı (sayi) iki kez yazmak birini ezer.
+  const gercek = [{ ornek: { $ne: true } }, { sayi: { $not: /^E-00000000-/ } }];
+  let kayit = null;
+  if (okunan.sayi) kayit = await Gorev.findOne({ $and: [{ sayi: okunan.sayi }, ...gercek] });
   if (!kayit && okunan.tarih) {
-    kayit = await Gorev.findOne({ tarih: okunan.tarih, dosya: { $in: [null, ''] }, driveId: { $in: [null, ''] }, ...gercek });
+    kayit = await Gorev.findOne({ $and: [
+      { tarih: okunan.tarih }, { dosya: { $in: [null, ''] } }, { driveId: { $in: [null, ''] } },
+      // Başka bir görev emrinin sayısını taşıyan kayıt aynı tarihte olsa da eşleşmez
+      ...(okunan.sayi ? [{ sayi: { $in: [null, '', okunan.sayi] } }] : []),
+      ...gercek
+    ] });
   }
   if (kayit) {
     for (const k of OCR_ALANLARI) {
@@ -193,6 +201,19 @@ app.post('/api/gorevler/:id/ocr', hata(async (req, res) => {
   const buf = g && await gorselGetir(g);
   if (!buf) return res.status(400).json({ hata: 'Bu kaydın görüntüsü yok.' });
   res.json(await gorevOku(buf, g.driveAd || '', await ocrBaglami())); // forma öneri olarak döner, kaydetmez
+}));
+
+// Seçerek oku: tarayıcıda kesilen parça yalnızca bellekte okunur, saklanmaz
+app.post('/api/ocr/secim', yukle.single('parca'), hata(async (req, res) => {
+  if (!req.file) return res.status(400).json({ hata: 'Seçilen parça alınamadı.' });
+  res.json(await secimOku(req.file.buffer, String(req.body?.alan || ''), await ocrBaglami()));
+}));
+
+// Bilgisayardan açılan görüntüyle OCR'ı yeniden çalıştır (kayda yazmaz, forma öneri döner)
+app.post('/api/ocr/tam', yukle.single('dosya'), hata(async (req, res) => {
+  if (!req.file) return res.status(400).json({ hata: 'Dosya alınamadı. Yalnızca JPEG ve PNG görüntüler okunabilir.' });
+  const ad = Buffer.from(req.file.originalname || '', 'latin1').toString('utf8');
+  res.json(await gorevOku(req.file.buffer, ad, await ocrBaglami()));
 }));
 
 app.get('/api/oneriler', hata(async (req, res) => {
@@ -377,7 +398,25 @@ app.get('/api/icmal/:tur/pdf', hata(async (req, res) => {
   res.send(buf);
 }));
 
+// ---------- Sistem denetimi: Tesseract ve Türkçe dil dosyası ----------
+const sistem = { tesseract: '', diller: [], tur: false, hata: '' };
+function sistemDenetle() {
+  const { execFile } = require('child_process');
+  execFile('tesseract', ['--version'], (e1, o1, h1) => {
+    if (e1) { sistem.hata = 'Tesseract bulunamadı; OCR çalışmaz.'; console.error(sistem.hata); return; }
+    sistem.tesseract = `${o1 || h1}`.split('\n')[0].trim();
+    execFile('tesseract', ['--list-langs'], (e2, o2, h2) => {
+      sistem.diller = `${o2}\n${h2}`.split('\n').map(x => x.trim()).filter(x => /^[a-z_]{3,}$/.test(x));
+      sistem.tur = sistem.diller.includes('tur');
+      if (!sistem.tur) { sistem.hata = 'Tesseract Türkçe dil dosyası (tur) yüklü değil; OCR düzgün çalışmaz.'; console.error(sistem.hata); }
+      else console.log(`OCR: ${sistem.tesseract}, diller: ${sistem.diller.join(' ')}`);
+    });
+  });
+}
+app.get('/api/sistem', (req, res) => res.json(sistem));
+
 (async () => {
+  sistemDenetle();
   for (let i = 1; ; i++) {
     try { await mongoose.connect(MONGO_URL); break; } catch (e) {
       if (i >= 30) throw e;

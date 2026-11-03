@@ -78,6 +78,7 @@
       <div class="container-fluid">
 
         <!-- GÖREV EMİRLERİ -->
+        <div class="alert alert-danger" id="sistemUyari" hidden></div>
         <section class="sekme" id="sekme-gorevler">
           <div class="row">
             <div class="col-lg-3 col-6">
@@ -270,8 +271,34 @@
     <div class="modal-body">
       <div class="row g-3">
         <div class="col-lg-7" id="gorselKutu">
-          <div class="gorsel-cerceve"><img id="gorsel" alt="Görev emri"></div>
-          <div class="d-flex gap-2 mt-2">
+          <div id="secimAraclari">
+            <div class="d-flex flex-wrap gap-1 align-items-center mb-1">
+              <span class="small text-body-secondary me-1"><i class="bi bi-bounding-box"></i> Seçerek oku:</span>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-alan="sayi">Sayı</button>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-alan="belgeNo">Belge no</button>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-alan="yerHam">Gideceği yer</button>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-alan="personel">Personel +</button>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-alan="surucu">Sürücü</button>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-alan="plaka">Plaka</button>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-alan="cikis">Çıkış</button>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-alan="donus">Dönüş</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" id="gorselBuyut" title="Büyüt / küçült"><i class="bi bi-zoom-in"></i></button>
+            </div>
+            <div class="form-text mb-1" id="secimIpucu">Bir alan seçip görüntüde o alanın yazılı olduğu bölgeyi fareyle (dokunmatik ekranda parmakla) çerçeveleyiniz.</div>
+          </div>
+          <div class="gorsel-cerceve" id="gorselCerceve">
+            <div class="gorsel-ic"><img id="gorsel" alt="Görev emri" draggable="false"><div id="secimKutu" hidden></div></div>
+          </div>
+          <div class="gorsel-bos border rounded p-4 text-center text-body-secondary" id="gorselBos" hidden>
+            <i class="bi bi-image fs-1 d-block mb-2"></i>
+            <div class="mb-2">Bu kaydın görüntüsü sunucuda saklanmıyor.</div>
+            <label class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-folder2-open"></i> Görüntüyü bu bilgisayardan aç
+              <input type="file" id="yerelGorsel" accept="image/jpeg,image/png" hidden>
+            </label>
+            <div class="form-text mt-2">Dosya yalnızca bu pencerede gösterilir; sunucuya kaydedilmez. Seçerek okuma için yalnızca çerçevelenen parça gönderilir.</div>
+          </div>
+          <div class="d-flex flex-wrap gap-2 mt-2">
             <a id="gorselAc" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="bi bi-box-arrow-up-right"></i> Yeni sekmede aç</a>
             <button class="btn btn-outline-secondary btn-sm" id="ocrTekrar" type="button"><i class="bi bi-arrow-repeat"></i> OCR'ı tekrar çalıştır</button>
           </div>

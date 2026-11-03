@@ -230,4 +230,4 @@ async function gorevOku(girdi, orijinalAd, baglam) {
   };
 }
 
-module.exports = { gorevOku, metinOku, kisiEslestir, plakaCoz, belgeNoCoz, yerOnIsle, ILCELER };
+module.exports = { gorevOku, metinOku, kisiEslestir, plakaCoz, belgeNoCoz, yerOnIsle, adBicimle, sayiBul, ILCELER };

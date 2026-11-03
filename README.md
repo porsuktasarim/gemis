@@ -28,6 +28,11 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
     gelir.
   - Dosya adında tarih varsa (`2026_10_13.jpg`, `13.10.2026.jpg`) görev tarihi
     oradan alınır.
+- **Seçerek oku**
+  - Düzenleme penceresinde bir alan seçilir (Sayı, Belge no, Gideceği yer, Personel, Sürücü, Plaka, Çıkış, Dönüş). Ardından görüntüde o alanın bulunduğu bölge fareyle ya da parmakla çerçevelenir.
+  - Yalnızca çerçevelenen parça okunur ve alana yazılır.
+  - El yazısı alanlarda yanlış değer yazılmaması için sonuç yalnızca bilinen kişi ya da plaka biçimine uyuyorsa yazılır; uymazsa okunan metin gösterilir.
+  - Görüntüsü sunucuda saklanmayan kayıtlarda görüntü bilgisayardan açılabilir. Dosya sunucuya kaydedilmez, yalnızca seçilen parça okunmak üzere gönderilir.
 - **Google Drive'dan içe aktarma**
   - Drive'daki görev emirleri klasörü ve alt klasörleri taranır. Yeni JPEG/PNG'ler OCR'dan geçirilip kayıt olarak eklenir.
   - Tarama düğmeyle ya da belirli aralıklarla otomatik yapılır.

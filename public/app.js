@@ -78,6 +78,9 @@ async function gorevleriYukle() {
 $('#gorevTablo').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) gorevAc(tr.dataset.id); });
 
 // ---------- Yükleme ----------
+// Bu oturumda yüklenen dosyalar (kayıt kimliği → dosya). Sunucu görüntüyü saklamasa da
+// düzenleme penceresinde gösterilip seçerek okunabilsin diye yalnızca tarayıcı belleğinde tutulur.
+const oturumDosyalari = new Map();
 $('#dosyaSec').addEventListener('change', async (e) => {
   const dosyalar = [...e.target.files];
   if (!dosyalar.length) return;
@@ -88,6 +91,7 @@ $('#dosyaSec').addEventListener('change', async (e) => {
     try {
       const r = await fetch('/api/gorevler/yukle', { method: 'POST', body: fd });
       const j = await r.json(); if (!r.ok) throw new Error(j.hata);
+      j.forEach(k => { if (k.id) oturumDosyalari.set(String(k.id), dosyalar[i]); });
       sonuc.push(...j);
     } catch (err) { sonuc.push({ dosya: dosyalar[i].name, durum: 'HATA: ' + err.message }); }
   }
@@ -122,14 +126,117 @@ function formDoldur(g) {
 async function gorevAc(id) {
   aktifGorev = id ? await api(`/api/gorevler/${id}`) : { personel: [] };
   formDoldur(aktifGorev);
-  const var_ = !!(aktifGorev.dosya || aktifGorev.driveId);
-  $('#gorselKutu').hidden = !var_;
-  if (var_) { const u = `/api/gorevler/${id}/gorsel?t=${Date.now()}`; $('#gorsel').src = u; $('#gorselAc').href = u; }
+  aktifYerelDosya = id ? oturumDosyalari.get(String(id)) || null : null;
+  if (aktifGorev.dosya || aktifGorev.driveId) gorselGoster(`/api/gorevler/${id}/gorsel?t=${Date.now()}`, true);
+  else if (aktifYerelDosya) gorselGoster(URL.createObjectURL(aktifYerelDosya), false);
+  else gorselGoster(null);
+  secimAlaniSec(null);
   $('#gorevSil').hidden = !id;
   modal.show();
 }
 $('#yeniGorev').addEventListener('click', () => gorevAc(null));
-$('.gorsel-cerceve').addEventListener('click', (e) => e.currentTarget.classList.toggle('buyuk'));
+
+// ---------- Görüntü ve seçerek okuma ----------
+let aktifYerelDosya = null;   // sunucuda görüntüsü olmayan kayıt için bilgisayardan açılan dosya
+let sunucuGorseli = false;
+let yerelUrl = null;
+
+function gorselGoster(url, sunucudan) {
+  if (yerelUrl && yerelUrl !== url) { URL.revokeObjectURL(yerelUrl); yerelUrl = null; }
+  const var_ = !!url;
+  sunucuGorseli = var_ && sunucudan;
+  if (var_ && !sunucudan) yerelUrl = url;
+  $('#gorselCerceve').hidden = !var_;
+  $('#secimAraclari').hidden = !var_;
+  $('#gorselBos').hidden = var_;
+  $('#gorselAc').hidden = !var_;
+  $('#ocrTekrar').hidden = !var_;
+  $('#gorselCerceve').classList.remove('buyuk');
+  if (var_) { $('#gorsel').src = url; $('#gorselAc').href = url; } else $('#gorsel').removeAttribute('src');
+}
+
+$('#yerelGorsel').addEventListener('change', (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  aktifYerelDosya = f;
+  if (aktifGorev?._id) oturumDosyalari.set(String(aktifGorev._id), f);
+  gorselGoster(URL.createObjectURL(f), false);
+});
+
+$('#gorselBuyut').addEventListener('click', () => {
+  const c = $('#gorselCerceve'); c.classList.toggle('buyuk');
+  $('#gorselBuyut i').className = c.classList.contains('buyuk') ? 'bi bi-zoom-out' : 'bi bi-zoom-in';
+});
+
+const ALAN_ADI = { sayi: 'Sayı', belgeNo: 'Belge no', yerHam: 'Gideceği yer', personel: 'Personel', surucu: 'Sürücü', plaka: 'Plaka', cikis: 'Çıkış saati', donus: 'Dönüş saati' };
+let secimAlani = null;
+function secimAlaniSec(alan) {
+  secimAlani = alan;
+  document.querySelectorAll('#secimAraclari [data-alan]').forEach(b => b.classList.toggle('active', b.dataset.alan === alan));
+  $('#gorselCerceve').classList.toggle('secim', !!alan);
+  $('#secimIpucu').textContent = alan
+    ? `${ALAN_ADI[alan]}: görüntüde bu alanın yazılı olduğu bölgeyi çerçeveleyiniz.`
+    : 'Bir alan seçip görüntüde o alanın yazılı olduğu bölgeyi fareyle (dokunmatik ekranda parmakla) çerçeveleyiniz.';
+}
+document.querySelectorAll('#secimAraclari [data-alan]').forEach(b => b.addEventListener('click', () => {
+  secimAlaniSec(secimAlani === b.dataset.alan ? null : b.dataset.alan);
+}));
+
+// Çerçeveleme: koordinatlar görüntünün ekrandaki boyutuna göre alınır, gerçek piksele çevrilir
+(() => {
+  const ic = $('.gorsel-ic'), img = $('#gorsel'), kutu = $('#secimKutu');
+  let bas = null;
+  const konum = (e) => { const r = img.getBoundingClientRect(); return { x: Math.max(0, Math.min(r.width, e.clientX - r.left)), y: Math.max(0, Math.min(r.height, e.clientY - r.top)) }; };
+  const ciz = (a, b) => {
+    Object.assign(kutu.style, { left: `${Math.min(a.x, b.x)}px`, top: `${Math.min(a.y, b.y)}px`, width: `${Math.abs(a.x - b.x)}px`, height: `${Math.abs(a.y - b.y)}px` });
+  };
+  ic.addEventListener('pointerdown', (e) => {
+    if (!secimAlani || !img.naturalWidth) return;
+    e.preventDefault(); ic.setPointerCapture(e.pointerId);
+    bas = konum(e); kutu.hidden = false; ciz(bas, bas);
+  });
+  ic.addEventListener('pointermove', (e) => { if (bas) ciz(bas, konum(e)); });
+  const bitir = async (e) => {
+    if (!bas) return;
+    const son = konum(e), a = bas; bas = null;
+    const w = Math.abs(a.x - son.x), h = Math.abs(a.y - son.y);
+    if (w < 8 || h < 6) { kutu.hidden = true; return; }
+    const olcek = img.naturalWidth / img.getBoundingClientRect().width;
+    await secimOku(secimAlani, Math.min(a.x, son.x) * olcek, Math.min(a.y, son.y) * olcek, w * olcek, h * olcek);
+    kutu.hidden = true;
+  };
+  ic.addEventListener('pointerup', bitir);
+  ic.addEventListener('pointercancel', () => { bas = null; kutu.hidden = true; });
+})();
+
+async function secimOku(alan, x, y, w, h) {
+  const img = $('#gorsel');
+  const tuval = document.createElement('canvas');
+  tuval.width = Math.round(w); tuval.height = Math.round(h);
+  tuval.getContext('2d').drawImage(img, Math.round(x), Math.round(y), Math.round(w), Math.round(h), 0, 0, tuval.width, tuval.height);
+  const parca = await new Promise(r => tuval.toBlob(r, 'image/png'));
+  const fd = new FormData(); fd.append('alan', alan); fd.append('parca', parca, 'parca.png');
+  $('#secimIpucu').innerHTML = `<span class="spinner-border spinner-border-sm"></span> ${ALAN_ADI[alan]} okunuyor…`;
+  try {
+    const r = await fetch('/api/ocr/secim', { method: 'POST', body: fd });
+    const j = await r.json(); if (!r.ok) throw new Error(j.hata);
+    const alanEl = form[alan];
+    const dolu = Array.isArray(j.deger) ? j.deger.length : j.deger;
+    if (dolu) {
+      if (alan === 'personel') {
+        const l = form.personel.value.split('\n').map(s => s.trim()).filter(Boolean);
+        j.deger.forEach(ad => { if (!l.includes(ad)) l.push(ad); });
+        form.personel.value = l.join('\n');
+      } else alanEl.value = j.deger;
+      if (alan === 'yerHam') yerOnizle();
+      alanEl.classList.add('is-valid'); setTimeout(() => alanEl.classList.remove('is-valid'), 2500);
+      $('#secimIpucu').innerHTML = `<span class="text-success"><i class="bi bi-check-circle"></i> ${ALAN_ADI[alan]}: ${esc(Array.isArray(j.deger) ? j.deger.join(', ') : j.deger)}</span>`;
+    } else {
+      alanEl.focus();
+      $('#secimIpucu').innerHTML = `<span class="text-warning-emphasis"><i class="bi bi-exclamation-triangle"></i> ${ALAN_ADI[alan]} güvenilir okunamadı${j.ham ? ` (okunan: "${esc(j.ham.replace(/\s+/g, ' ').slice(0, 40))}")` : ''}; alanı elle yazınız.</span>`;
+    }
+  } catch (err) { $('#secimIpucu').innerHTML = `<span class="text-danger">${esc(err.message)}</span>`; }
+}
 
 function yerOnizle() {
   // Sunucudaki ayrıştırmanın basit önizlemesi
@@ -145,9 +252,14 @@ $('#kisiEkleBtn').addEventListener('click', () => {
 });
 
 $('#ocrTekrar').addEventListener('click', async () => {
-  if (!aktifGorev?._id) return;
   bildir('OCR çalışıyor…');
-  const o = await api(`/api/gorevler/${aktifGorev._id}/ocr`, { method: 'POST' });
+  let o;
+  if (sunucuGorseli && aktifGorev?._id) o = await api(`/api/gorevler/${aktifGorev._id}/ocr`, { method: 'POST' });
+  else if (aktifYerelDosya) {
+    const fd = new FormData(); fd.append('dosya', aktifYerelDosya);
+    const r = await fetch('/api/ocr/tam', { method: 'POST', body: fd });
+    o = await r.json(); if (!r.ok) { bildir(o.hata || 'OCR başarısız'); return; }
+  } else { bildir('Görüntü yok.'); return; }
   // Yalnızca boş alanları doldur
   if (!form.tarih.value && o.tarih) form.tarih.value = o.tarih;
   if (!form.sayi.value && o.sayi) form.sayi.value = o.sayi;
@@ -362,4 +474,7 @@ $('#driveTara').addEventListener('click', async () => {
   btn.disabled = false;
 });
 
+api('/api/sistem').then(d => {
+  if (d.hata) { $('#sistemUyari').innerHTML = `<i class="bi bi-exclamation-octagon me-1"></i> ${esc(d.hata)} Docker imajını yeniden derleyiniz: <code>docker compose up -d --build</code>`; $('#sistemUyari').hidden = false; }
+}).catch(() => {});
 personelYukle().then(() => { gorevleriYukle(); kisiSecimiYukle(); }); onerileriYukle(); driveDurumYukle();

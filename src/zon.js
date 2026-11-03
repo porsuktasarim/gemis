@@ -233,4 +233,4 @@ async function bolgeselOku(girdi) {
   return sonuc;
 }
 
-module.exports = { bolgeselOku, saatCoz, adTemizle };
+module.exports = { bolgeselOku, saatCoz, adTemizle, tesseract };
