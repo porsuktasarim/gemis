@@ -64,7 +64,7 @@ function birRapor(g, ayar, { kisiler, plakalar, raporTarihi }) {
       <td>Taşıt Görev Emri Sıra No:</td>
       <td class="kalin buyuk">${esc(siraNo(g.belgeNo))}</td>
       <td colspan="3"></td>
-      <td>${esc(raporTarihi ? kisaTarih(raporTarihi) : '')}</td>
+      <td class="sag">${esc(raporTarihi ? kisaTarih(raporTarihi) : '')}</td>
     </tr>
     <tr class="ara cercevesiz"><td colspan="6"></td></tr>
     <tr class="yuksek">
@@ -76,14 +76,14 @@ function birRapor(g, ayar, { kisiler, plakalar, raporTarihi }) {
     <tr><td>Mahalle</td><td colspan="4">${esc(yer.mahalle)}</td></tr>
     <tr><td>İşletme/Yer</td><td colspan="4">${esc(g.raporIsletme || ayarDegeri(ayar, 'raporIsletme'))}</td></tr>
     <tr>
-      <td>Göreve Çıkış Tarihi:</td><td>${esc(kisaTarih(g.tarih))}</td>
-      <td>Göreve Çıkış Saati</td><td>${esc(g.cikis || '')}</td>
-      <td>Görevden Dönüş Saati</td><td>${esc(g.donus || '')}</td>
+      <td>Göreve Çıkış Tarihi:</td><td class="orta">${esc(kisaTarih(g.tarih))}</td>
+      <td>Göreve Çıkış Saati</td><td class="orta">${esc(g.cikis || '')}</td>
+      <td>Görevden Dönüş Saati</td><td class="orta">${esc(g.donus || '')}</td>
     </tr>
     <tr>
-      <td>Görevli Araç Plaka No:</td><td>${esc(g.plaka || '')}</td>
-      <td>Resmi</td><td>${tur === 'resmi' ? 'X' : ''}</td>
-      <td>Özel</td><td>${tur === 'ozel' ? 'X' : ''}</td>
+      <td>Görevli Araç Plaka No:</td><td class="orta">${esc(g.plaka || '')}</td>
+      <td>Resmi</td><td class="orta">${tur === 'resmi' ? 'X' : ''}</td>
+      <td>Özel</td><td class="orta">${tur === 'ozel' ? 'X' : ''}</td>
     </tr>
   </table>
 
@@ -124,17 +124,19 @@ function raporSayfasi(gorevler, ayar, secenek = {}) {
   .logo { width: 30mm; height: 30mm; object-fit: contain; }
   .antet-metin { text-align: center; font-weight: bold; font-size: 12pt; line-height: 1.45; }
   table.form { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  /* Tablodaki bütün hücreler (sıra no, tarihler, saatler, plaka, X dahil) sola yaslıdır */
+  /* Etiketler ve sıra no sola, rapor tarihi sağa yaslı; çıkış tarihi, saatler, plaka ve X kendi hücresinde ortalı */
   table.form td { border: 1px solid #000; padding: 1.6mm 2mm; text-align: left; vertical-align: middle; line-height: 1.25; word-wrap: break-word; }
   /* İlk iki satır (sıra no / rapor tarihi ve ara satır) çerçevesizdir */
   table.form tr.cercevesiz td { border: none; }
   table.form tr.ara td { height: 6mm; padding: 0; }
   table.form tr.yuksek td { height: 14mm; }
+  table.form td.orta { text-align: center; }
+  table.form td.sag { text-align: right; }
   .kalin { font-weight: bold; } .buyuk { font-size: 12pt; } .ince { font-size: 10pt; }
   .sonuc { margin: 12mm 0 0; min-height: 22mm; line-height: 1.4; outline: none; }
   .sonuc:hover, .sonuc:focus { background: #fff8d6; box-shadow: 0 0 0 1mm #fff8d6; }
-  /* İmza kısmı sola yaslıdır (başlık, ad soyad, ünvan) */
-  .imzalar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8mm 4mm; margin-top: 6mm; text-align: left; line-height: 1.35; }
+  /* İmza kısmı: başlık, ad soyad ve ünvan her imzacının kendi alanında ortalı */
+  .imzalar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8mm 4mm; margin-top: 6mm; text-align: center; line-height: 1.35; }
   .imza-baslik { margin-bottom: 1mm; }
   .imza-alan { height: 16mm; }
   .goruldu { margin: 16mm auto 0; text-align: center; line-height: 1.5; }
