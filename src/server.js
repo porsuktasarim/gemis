@@ -380,6 +380,19 @@ app.get('/api/gorevler/:id/rapor-gorsel', hata(async (req, res) => {
   res.send(buf);
 }));
 
+// Görev sonu raporunun açıklama metni (yazdırma sayfasından). Ayarlar'daki varsayılanla aynıysa ya da
+// boş bırakılırsa göreve ayrıca yazılmaz; böylece Ayarlar'daki metin değişince bu görev de güncel kalır.
+app.put('/api/gorevler/:id/rapor-metni', hata(async (req, res) => {
+  const g = await Gorev.findById(req.params.id);
+  if (!g) return res.status(404).json({ hata: 'Kayıt bulunamadı' });
+  const ayar = await ayarGetir();
+  const varsayilan = (ayar.raporSonuc || RAPOR_VARSAYILAN.raporSonuc || '').trim();
+  const metin = String(req.body?.raporMetni ?? '').trim();
+  g.raporMetni = metin && metin !== varsayilan ? metin : undefined;
+  await g.save();
+  res.json({ ok: true, metin: g.raporMetni || varsayilan });
+}));
+
 // Taranmış raporun bağlantısını kaldırır (Drive'daki dosyaya dokunulmaz; tekrar taramada yeniden bağlanabilir)
 app.delete('/api/gorevler/:id/rapor', hata(async (req, res) => {
   const g = await Gorev.findById(req.params.id);

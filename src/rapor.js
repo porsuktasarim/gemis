@@ -45,7 +45,7 @@ function birRapor(g, ayar, { kisiler, plakalar, raporTarihi }) {
         <div>${esc(unvan(ad))}</div>
       </div>`).join('');
   return `
-<section class="sayfa">
+<section class="sayfa" data-id="${esc(String(g._id || ''))}">
   <header class="antet">
     ${ayar.raporLogo ? `<img class="logo" src="${esc(ayar.raporLogo)}" alt="">` : '<div class="logo"></div>'}
     <div class="antet-metin">
@@ -87,7 +87,7 @@ function birRapor(g, ayar, { kisiler, plakalar, raporTarihi }) {
     </tr>
   </table>
 
-  <div class="sonuc" contenteditable="true" spellcheck="false" title="Yazdırmadan önce bu sayfada değiştirilebilir (kaydedilmez)">${esc(g.raporMetni || ayarDegeri(ayar, 'raporSonuc')).replace(/\n/g, '<br>')}</div>
+  <div class="sonuc" contenteditable="true" spellcheck="false" title="Tıklayıp değiştirebilirsiniz; metinden çıkınca bu göreve kaydedilir">${esc(g.raporMetni || ayarDegeri(ayar, 'raporSonuc')).replace(/\n/g, '<br>')}</div>
 
   <div class="imzalar">${imzalar}</div>
 
@@ -154,10 +154,28 @@ function raporSayfasi(gorevler, ayar, secenek = {}) {
 <div class="arac">
   <button type="button" onclick="window.print()">Yazdır</button>
   <label>Rapor tarihi <input type="date" id="raporTarihi" value="${esc(secenek.raporTarihi || '')}"></label>
-  <span class="not">${gorevler.length} rapor · Açıklama metnine tıklayıp bu sayfada değiştirebilirsiniz (kalıcı değişiklik için görev penceresi ya da Ayarlar). Yazdırma penceresinde kâğıt A4, kenar boşlukları "Varsayılan", "Üstbilgi ve altbilgi" kapalı olmalıdır.</span>
+  <span class="not">${gorevler.length} rapor · Açıklama metnine tıklayıp değiştirebilirsiniz; metinden çıkınca o göreve kaydedilir. <span id="kayitDurum"></span> Yazdırma penceresinde kâğıt A4, kenar boşlukları "Varsayılan", "Üstbilgi ve altbilgi" kapalı olmalıdır.</span>
 </div>
 ${govde}
 <script>
+  // Açıklama metni: değişiklik, metinden çıkınca (ya da yazdırmadan önce) göreve kaydedilir
+  var durum = document.getElementById('kayitDurum');
+  function kaydet(el) {
+    var metin = el.innerText.replace(/\\u00a0/g, ' ').replace(/\\n{3,}/g, '\\n\\n').trim();
+    if (metin === el.dataset.son) return Promise.resolve();
+    var id = el.closest('section.sayfa').dataset.id;
+    if (!id) return Promise.resolve();
+    durum.textContent = 'Kaydediliyor…';
+    return fetch('/api/gorevler/' + id + '/rapor-metni', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ raporMetni: metin }) })
+      .then(function (r) { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+      .then(function (j) { el.dataset.son = metin; if (!metin) { el.innerText = j.metin; el.dataset.son = j.metin; } durum.textContent = '✓ Kaydedildi'; })
+      .catch(function (e) { durum.textContent = '⚠ Kaydedilemedi: ' + e.message; });
+  }
+  document.querySelectorAll('.sonuc').forEach(function (el) {
+    el.dataset.son = el.innerText.trim();
+    el.addEventListener('blur', function () { kaydet(el); });
+  });
+  window.addEventListener('beforeprint', function () { document.querySelectorAll('.sonuc').forEach(kaydet); });
   document.getElementById('raporTarihi').addEventListener('change', function () {
     var u = new URL(location.href); u.searchParams.set('raporTarihi', this.value); location.href = u.toString();
   });
