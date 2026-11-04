@@ -127,7 +127,7 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
     metni Ayarlar'da tanımlanır, gerekirse göreve özel değiştirilir. Antet logosu isteğe
     bağlıdır ve Ayarlar'dan yüklenir.
   - İmzalanıp taranan rapor, görev emirleri gibi yüklenir (elle ya da Drive). OCR raporu
-    tanır, sıra numarasından (ve sayfa altındaki `GEMİS-R` satırından) ilgili göreve bağlar;
+    tanır, sıra numarasından (ve çıkış tarihinden) ilgili göreve bağlar;
     yeni görev açmaz. Listede rapor yüklenen görevler işaretlenir.
   - Görev emirleri PDF'ine *Taranmış görev sonu raporlarını da ekle* seçeneğiyle raporlar
     da eklenebilir (görüntü saklama açıksa ya da rapor Drive'dan geldiyse).

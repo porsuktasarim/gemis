@@ -1,6 +1,6 @@
 // Görevlendirme ve Görev Sonu Raporu: her görev emri için A4 tek sayfa, yazdırmaya hazır HTML.
 // Rapor imzalatılıp taranınca yeniden yüklenir; OCR raporu tanır ve sıra numarasından göreve bağlar
-// (raporTani). Sayfanın altındaki küçük "GEMİS-R" satırı bu eşleştirmeyi kolaylaştırır.
+// (raporTani): "Taşıt Görev Emri Sıra No" ve "Göreve Çıkış Tarihi" alanlarından.
 const { esc, trUpper, sade } = require('./util');
 
 const VARSAYILAN = {
@@ -99,7 +99,6 @@ function birRapor(g, ayar, { kisiler, plakalar, raporTarihi }) {
   </div>
 
   <footer class="alt">
-    <span class="iz">GEMİS-R ${esc(g.belgeNo || '------')} · ${esc(g.tarih || '')}</span>
     <span class="birim">${esc(ayar.sube || '')}</span>
   </footer>
 </section>`;
@@ -139,9 +138,8 @@ function raporSayfasi(gorevler, ayar, secenek = {}) {
   .imza-baslik { margin-bottom: 1mm; }
   .imza-alan { height: 16mm; }
   .goruldu { margin: 16mm auto 0; text-align: center; line-height: 1.5; }
-  /* Sayfa altı: solda eşleştirme izi (GEMİS-R), sağda şube adı */
-  .alt { margin-top: auto; padding-top: 6mm; display: flex; justify-content: space-between; align-items: flex-end; gap: 6mm; }
-  .iz { font-family: "Courier New", monospace; font-size: 8pt; color: #555; letter-spacing: .5px; }
+  /* Sayfa altı: sağda şube adı */
+  .alt { margin-top: auto; padding-top: 6mm; display: flex; justify-content: flex-end; align-items: flex-end; gap: 6mm; }
   .birim { text-align: right; }
   .bilgi { text-align: center; padding: 40px; }
   @media print {
