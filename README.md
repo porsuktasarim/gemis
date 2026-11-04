@@ -111,6 +111,12 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
   Eski "34 ABC 2159" yazımları açılışta kendiliğinden çevrilir.
 
 - **Görevlendirme ve Görev Sonu Raporu**
+  - Kenar menüdeki **Görev Sonu Raporları** modülünde ay ve personele göre görevler, her
+    görevin rapor durumu (yüklendi / bekleniyor) ve eksik bilgileri listelenir. Raporlar
+    tek tek, seçilerek ya da listenin tümü için yazdırılır; rapor tarihi buradan seçilir.
+  - İmzalı raporlar modülden toplu yüklenir (OCR ile sıra numarasından eşleşir; rapor
+    olarak tanınmayan görüntüyle görev açılmaz) ya da satırdaki ataş düğmesiyle doğrudan
+    o göreve bağlanır.
   - Her görev emri için A4 tek sayfalık rapor, kayıttaki bilgilerle (sıra no, ekip başkanı,
     görev konusu, ilçe/mahalle, çıkış tarihi ve saatleri, plaka, görevli personelin imza
     alanları, "Görüldü" bölümü) yazdırmaya hazır olarak üretilir.

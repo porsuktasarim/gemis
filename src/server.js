@@ -413,6 +413,43 @@ app.get('/rapor', hata(async (req, res) => {
 }));
 
 // Elle yükleme + OCR. Görüntü bellekte işlenir; yalnızca saklama seçeneği açıksa diske yazılır.
+// Görev Sonu Raporları modülü: yalnızca imzalı rapor yükleme. Görüntü rapor olarak tanınmazsa
+// görev açılmaz; listedeki satırdan ilgili göreve elle bağlanabilir.
+app.post('/api/raporlar/yukle', yukle.array('dosyalar', 60), hata(async (req, res) => {
+  if (!req.files?.length) return res.status(400).json({ hata: 'Dosya alınamadı. Yalnızca JPEG ve PNG görüntüler okunabilir.' });
+  const ayar = await ayarGetir();
+  const baglam = await ocrBaglami();
+  const sonuc = [];
+  for (const f of req.files) {
+    const ad = Buffer.from(f.originalname, 'latin1').toString('utf8');
+    try {
+      const okunan = await gorevOku(f.buffer, ad, baglam);
+      const r = raporTani(okunan.ocrMetin);
+      if (!r) { sonuc.push({ dosya: ad, durum: 'görev sonu raporu olarak tanınamadı; listedeki satırdan ilgili göreve bağlayınız', hata: true }); continue; }
+      const { kayit, durum } = await raporBagla(r, { kaydet: ayar.gorselSakla ? () => yerelKaydet(f.buffer, ad) : null });
+      sonuc.push({ id: kayit?._id, dosya: ad, durum, tarih: kayit?.tarih, hata: !kayit });
+    } catch (e) {
+      sonuc.push({ dosya: ad, durum: 'okunamadı: ' + e.message, hata: true });
+    }
+  }
+  res.json(sonuc);
+}));
+
+// Taranmış raporu OCR'sız, doğrudan seçilen göreve bağlar
+app.post('/api/gorevler/:id/rapor', yukle.single('dosya'), hata(async (req, res) => {
+  if (!req.file) return res.status(400).json({ hata: 'Dosya alınamadı. Yalnızca JPEG ve PNG görüntüler okunabilir.' });
+  const g = await Gorev.findById(req.params.id);
+  if (!g) return res.status(404).json({ hata: 'Kayıt bulunamadı' });
+  const ayar = await ayarGetir();
+  const ad = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+  if (g.raporDosya) fs.unlink(path.join(UPLOAD_DIR, g.raporDosya), () => {});
+  g.raporDosya = ayar.gorselSakla ? yerelKaydet(req.file.buffer, ad) : undefined;
+  g.raporDriveId = undefined; g.raporDriveAd = undefined;
+  g.raporYuklendi = new Date();
+  await g.save();
+  res.json({ ok: true, saklandi: !!g.raporDosya });
+}));
+
 app.post('/api/gorevler/yukle', yukle.array('dosyalar', 60), hata(async (req, res) => {
   if (!req.files?.length) return res.status(400).json({ hata: 'Dosya alınamadı. Yalnızca JPEG ve PNG görüntüler okunabilir.' });
   const ayar = await ayarGetir();

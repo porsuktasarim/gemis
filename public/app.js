@@ -25,13 +25,14 @@ const buAy = new Date().toISOString().slice(0, 7);
 const gecenAy = (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); })();
 
 // ---------- Sekmeler (sol menü) ----------
-const SEKME_ADI = { gorevler: 'Görev Emirleri', icmaller: 'İcmaller', ayarlar: 'Ayarlar' };
+const SEKME_ADI = { gorevler: 'Görev Emirleri', icmaller: 'İcmaller', raporlar: 'Görev Sonu Raporları', ayarlar: 'Ayarlar' };
 function sekmeAc(ad) {
   document.querySelectorAll('.sidebar-menu [data-sekme]').forEach(x => x.classList.toggle('active', x.dataset.sekme === ad));
   document.querySelectorAll('section.sekme').forEach(s => { s.hidden = s.id !== `sekme-${ad}`; });
   $('#sayfaBaslik').textContent = SEKME_ADI[ad]; $('#sayfaYol').textContent = SEKME_ADI[ad];
   document.body.classList.remove('sidebar-open'); // mobilde menüyü kapat
   if (ad === 'ayarlar') ayarlariYukle();
+  if (ad === 'raporlar') raporModuluAc();
 }
 document.querySelectorAll('[data-sekme]').forEach(b => b.addEventListener('click', (e) => { e.preventDefault(); sekmeAc(b.dataset.sekme); }));
 
@@ -684,3 +685,143 @@ api('/api/gorevler-aylar').then(({ aylar }) => {
   if (aylar.length && !aylar.some(a => a.ay === $('#gorevAy').value)) $('#gorevAy').value = aylar[0].ay;
 }).catch(() => {}).finally(gorevleriYukle);
 kisiSecimiYukle(); onerileriYukle(); driveDurumYukle();
+
+
+// ---------- Görev Sonu Raporları modülü ----------
+// Görev emri kayıtlarından rapor listesi: filtre, seçerek/toplu yazdırma, imzalı raporun yüklenmesi.
+let rpListe = [], rpIlkAcilis = true, rpTekId = null;
+const rpSecili = new Set();
+const bugunISO = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const siraNo6 = (b) => { const d = String(b || '').replace(/\D/g, ''); return d ? d.padStart(6, '0') : ''; };
+
+async function raporModuluAc() {
+  if (rpIlkAcilis) {
+    rpIlkAcilis = false;
+    $('#rpAy').value = $('#gorevAy').value || gecenAy;
+    $('#rpTarih').value = bugunISO();
+  }
+  // Personel seçimi: "Ad SOYAD - Görevi" (sürücüler de seçilebilir; rapor görevli listesine göre süzülür)
+  const onceki = $('#rpKisi').value;
+  $('#rpKisi').innerHTML = '<option value="">Tüm personel</option>' + kisiListesi
+    .slice().sort((a, b) => a.ad.localeCompare(b.ad, 'tr'))
+    .map(k => `<option value="${esc(k.ad)}">${esc(k.ad)}${k.unvan ? ' - ' + esc(k.unvan) : ''}</option>`).join('');
+  $('#rpKisi').value = onceki;
+  await raporlariYukle();
+}
+
+async function raporlariYukle() {
+  const ay = $('#rpAy').value;
+  if (!ay) return;
+  let liste = [];
+  try { liste = await api(`/api/gorevler?ay=${ay}`); } catch (e) { bildir('Liste alınamadı: ' + e.message); }
+  liste = liste.filter(g => g.tarih && g.tarih.startsWith(ay));
+  rpListe = liste;
+  const kisi = sadeAd($('#rpKisi').value);
+  const durum = $('#rpDurum').value;
+  const gorunen = liste.filter(g =>
+    (!kisi || (g.personel || []).some(p => sadeAd(p) === kisi)) &&
+    (!durum || (durum === 'yuklendi') === !!g.raporYuklendi));
+  gorunen.sort((a, b) => a.tarih.localeCompare(b.tarih) || siraNo6(a.belgeNo).localeCompare(siraNo6(b.belgeNo)));
+  for (const id of [...rpSecili]) if (!gorunen.some(g => g._id === id)) rpSecili.delete(id);
+
+  const kapsam = liste.filter(g => !kisi || (g.personel || []).some(p => sadeAd(p) === kisi));
+  $('#rpToplam').textContent = kapsam.length;
+  $('#rpYuklenen').textContent = kapsam.filter(g => g.raporYuklendi).length;
+  $('#rpBekleyen').textContent = kapsam.filter(g => !g.raporYuklendi).length;
+
+  $('#rpTablo').innerHTML = gorunen.length ? gorunen.map(g => {
+    let satir;
+    try {
+      const p = (g.personel || []).filter(Boolean);
+      const eksik = [!g.belgeNo && 'sıra no', !p.length && 'görevli', !g.cikis && 'çıkış saati', !g.donus && 'dönüş saati'].filter(Boolean);
+      const gorsel = !!(g.raporDosya || g.raporDriveId);
+      const durumHtml = g.raporYuklendi
+        ? `<span class="badge text-bg-success" title="${esc(new Date(g.raporYuklendi).toLocaleString('tr-TR'))}">Yüklendi${gorsel ? '' : ' (görüntü saklanmadı)'}</span>`
+        : '<span class="badge text-bg-warning">Bekleniyor</span>';
+      satir = `<tr data-id="${g._id}">
+        <td><input type="checkbox" class="form-check-input rp-sec" ${rpSecili.has(g._id) ? 'checked' : ''}></td>
+        <td class="text-nowrap">${esc(tarihTR(g.tarih))}</td>
+        <td class="font-monospace">${esc(siraNo6(g.belgeNo)) || '<span class="text-danger">yok</span>'}</td>
+        <td class="text-nowrap"><a href="#" class="rp-ac" title="Görev emrini aç">${esc(p[0] || '—')}</a></td>
+        <td class="small">${esc(p.slice(1).join(', '))}</td>
+        <td class="small">${esc(yerYaz(g.yer) || g.yerHam || '')}</td>
+        <td class="text-nowrap">${esc(g.plaka || '')}</td>
+        <td class="text-nowrap small">${esc(g.cikis || '')}–${esc(g.donus || '')}</td>
+        <td>${durumHtml}${eksik.length ? `<div class="small text-danger">Eksik: ${esc(eksik.join(', '))}</div>` : ''}</td>
+        <td class="text-end text-nowrap">
+          <button class="btn btn-outline-dark btn-sm rp-yazdir" title="Raporu yazdır"><i class="bi bi-printer"></i></button>
+          <button class="btn btn-outline-success btn-sm rp-tek" title="İmzalı raporu bu göreve yükle"><i class="bi bi-paperclip"></i></button>
+          ${gorsel ? `<a class="btn btn-outline-secondary btn-sm" href="/api/gorevler/${g._id}/rapor-gorsel" target="_blank" title="Taranmış raporu aç"><i class="bi bi-eye"></i></a>` : ''}
+          ${g.raporYuklendi ? '<button class="btn btn-outline-danger btn-sm rp-kaldir" title="Rapor bağlantısını kaldır"><i class="bi bi-x-lg"></i></button>' : ''}
+        </td></tr>`;
+    } catch (e) { satir = `<tr><td colspan="10" class="text-danger small">Kayıt gösterilemedi: ${esc(e.message)}</td></tr>`; }
+    return satir;
+  }).join('') : `<tr><td colspan="10" class="text-center text-body-secondary py-4">Bu ay için ${liste.length ? 'seçime uyan ' : ''}görev emri yok.</td></tr>`;
+  rpSecimGuncelle();
+}
+
+function rpSecimGuncelle() {
+  $('#rpSecimSayisi').textContent = rpSecili.size;
+  $('#rpSecilenYazdir').disabled = !rpSecili.size;
+  const kutular = [...document.querySelectorAll('#rpTablo .rp-sec')];
+  $('#rpHepsi').checked = kutular.length > 0 && kutular.every(k => k.checked);
+}
+const rpYazdir = (idler) => {
+  if (!idler.length) return bildir('Yazdırılacak görev yok.');
+  const t = $('#rpTarih').value;
+  window.open(`/rapor?id=${idler.join(',')}${t ? '&raporTarihi=' + t : ''}`, '_blank');
+};
+const rpGorunenIdler = () => [...document.querySelectorAll('#rpTablo tr[data-id]')].map(tr => tr.dataset.id);
+
+['#rpAy', '#rpKisi', '#rpDurum'].forEach(s => $(s).addEventListener('change', raporlariYukle));
+$('#rpHepsi').addEventListener('change', (e) => {
+  rpGorunenIdler().forEach(id => e.target.checked ? rpSecili.add(id) : rpSecili.delete(id));
+  document.querySelectorAll('#rpTablo .rp-sec').forEach(k => { k.checked = e.target.checked; });
+  rpSecimGuncelle();
+});
+$('#rpSecilenYazdir').addEventListener('click', () => rpYazdir(rpGorunenIdler().filter(id => rpSecili.has(id))));
+$('#rpTumunuYazdir').addEventListener('click', () => rpYazdir(rpGorunenIdler()));
+$('#rpTablo').addEventListener('click', async (e) => {
+  const tr = e.target.closest('tr[data-id]'); if (!tr) return;
+  const id = tr.dataset.id;
+  if (e.target.classList.contains('rp-sec')) { e.target.checked ? rpSecili.add(id) : rpSecili.delete(id); return rpSecimGuncelle(); }
+  if (e.target.closest('.rp-ac')) { e.preventDefault(); return gorevAc(id); }
+  if (e.target.closest('.rp-yazdir')) return rpYazdir([id]);
+  if (e.target.closest('.rp-tek')) { rpTekId = id; $('#rpTekYukle').value = ''; return $('#rpTekYukle').click(); }
+  if (e.target.closest('.rp-kaldir')) {
+    if (!confirm('Taranmış raporun bu görevle bağlantısı kaldırılsın mı?')) return;
+    await api(`/api/gorevler/${id}/rapor`, { method: 'DELETE' });
+    raporlariYukle();
+  }
+});
+// Satırdaki ataş: seçilen görüntü OCR'sız doğrudan bu göreve bağlanır
+$('#rpTekYukle').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; if (!f || !rpTekId) return;
+  const fd = new FormData(); fd.append('dosya', f);
+  try {
+    const r = await fetch(`/api/gorevler/${rpTekId}/rapor`, { method: 'POST', body: fd });
+    const j = await r.json(); if (!r.ok) throw new Error(j.hata || r.statusText);
+    bildir(j.saklandi ? 'Rapor göreve bağlandı.' : 'Rapor göreve bağlandı (görüntü saklama kapalı olduğu için görüntü sunucuda tutulmadı).');
+  } catch (err) { bildir('Yüklenemedi: ' + err.message); }
+  rpTekId = null; raporlariYukle();
+});
+// Toplu yükleme: her görüntü OCR ile okunur, sıra numarasından göreve bağlanır
+$('#rpYukle').addEventListener('change', async (e) => {
+  const dosyalar = [...e.target.files]; if (!dosyalar.length) return;
+  const alan = $('#rpYukleSonuc');
+  const satirlar = [];
+  for (let i = 0; i < dosyalar.length; i++) {
+    alan.innerHTML = `<span class="spinner-border spinner-border-sm"></span> ${i + 1}/${dosyalar.length} okunuyor: ${esc(dosyalar[i].name)}`;
+    const fd = new FormData(); fd.append('dosyalar', dosyalar[i]);
+    try {
+      const r = await fetch('/api/raporlar/yukle', { method: 'POST', body: fd });
+      const j = await r.json(); if (!r.ok) throw new Error(j.hata || r.statusText);
+      j.forEach(k => satirlar.push(`<div class="${k.hata ? 'text-danger' : 'text-success'}"><i class="bi bi-${k.hata ? 'exclamation-triangle' : 'check-circle'}"></i> ${esc(k.dosya)}: ${esc(k.durum)}</div>`));
+    } catch (err) { satirlar.push(`<div class="text-danger"><i class="bi bi-exclamation-triangle"></i> ${esc(dosyalar[i].name)}: ${esc(err.message)}</div>`); }
+  }
+  alan.innerHTML = satirlar.join('');
+  e.target.value = '';
+  raporlariYukle();
+});
+// Görev penceresi kapanınca (düzenleme sonrası) açık olan rapor listesi yenilenir
+document.getElementById('gorevModal')?.addEventListener('hidden.bs.modal', () => { if (!$('#sekme-raporlar').hidden) raporlariYukle(); });

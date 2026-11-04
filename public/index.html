@@ -50,6 +50,7 @@
           <li class="nav-header">İŞLEMLER</li>
           <li class="nav-item"><a href="#" class="nav-link active" data-sekme="gorevler"><i class="nav-icon bi bi-truck"></i><p>Görev Emirleri</p></a></li>
           <li class="nav-item"><a href="#" class="nav-link" data-sekme="icmaller"><i class="nav-icon bi bi-file-earmark-spreadsheet"></i><p>İcmaller</p></a></li>
+          <li class="nav-item"><a href="#" class="nav-link" data-sekme="raporlar"><i class="nav-icon bi bi-clipboard-check"></i><p>Görev Sonu Raporları</p></a></li>
           <li class="nav-header">YÖNETİM</li>
           <li class="nav-item"><a href="#" class="nav-link" data-sekme="ayarlar"><i class="nav-icon bi bi-gear"></i><p>Ayarlar</p></a></li>
         </ul>
@@ -180,6 +181,47 @@
         </section>
 
         <!-- AYARLAR -->
+        <section class="sekme" id="sekme-raporlar" hidden>
+          <div class="row">
+            <div class="col-lg-4 col-6"><div class="small-box text-bg-primary"><div class="inner"><h3 id="rpToplam">0</h3><p>Görev</p></div><i class="small-box-icon bi bi-clipboard"></i></div></div>
+            <div class="col-lg-4 col-6"><div class="small-box text-bg-success"><div class="inner"><h3 id="rpYuklenen">0</h3><p>İmzalı rapor yüklendi</p></div><i class="small-box-icon bi bi-clipboard-check"></i></div></div>
+            <div class="col-lg-4 col-12"><div class="small-box text-bg-warning"><div class="inner"><h3 id="rpBekleyen">0</h3><p>Rapor bekleniyor</p></div><i class="small-box-icon bi bi-hourglass-split"></i></div></div>
+          </div>
+          <div class="card card-primary card-outline mb-3">
+            <div class="card-header"><h3 class="card-title">Görevlendirme ve Görev Sonu Raporu</h3></div>
+            <div class="card-body">
+              <p class="small text-body-secondary mb-2">Raporlar görev emri kayıtlarından kendiliğinden hazırlanır: sıra no, ekip başkanı (görevli listesindeki ilk kişi), görev konusu, gidilen yer, çıkış tarihi ve saatleri, plaka, görevlilerin imza alanları. Yazdırılıp imzalatılan rapor taranarak aşağıdan yüklenir ve görev emriyle eşleştirilir.</p>
+              <div class="row g-2 align-items-end">
+                <div class="col-auto"><label class="form-label small mb-0" for="rpAy">Ay</label><input type="month" id="rpAy" class="form-control form-control-sm"></div>
+                <div class="col-auto"><label class="form-label small mb-0" for="rpKisi">Personel</label><select id="rpKisi" class="form-select form-select-sm" style="min-width:14rem"></select></div>
+                <div class="col-auto"><label class="form-label small mb-0" for="rpDurum">Durum</label>
+                  <select id="rpDurum" class="form-select form-select-sm"><option value="">Tümü</option><option value="bekliyor">Rapor bekleniyor</option><option value="yuklendi">Rapor yüklendi</option></select></div>
+                <div class="col-auto"><label class="form-label small mb-0" for="rpTarih">Rapor tarihi</label><input type="date" id="rpTarih" class="form-control form-control-sm"></div>
+                <div class="col-auto d-flex flex-wrap gap-2">
+                  <button class="btn btn-primary btn-sm" id="rpSecilenYazdir" disabled><i class="bi bi-printer"></i> Seçilenleri yazdır (<span id="rpSecimSayisi">0</span>)</button>
+                  <button class="btn btn-outline-primary btn-sm" id="rpTumunuYazdir"><i class="bi bi-printer"></i> Listedekilerin tümünü yazdır</button>
+                  <label class="btn btn-success btn-sm mb-0"><i class="bi bi-upload"></i> İmzalı rapor yükle
+                    <input type="file" id="rpYukle" accept="image/jpeg,image/png" multiple hidden></label>
+                </div>
+              </div>
+              <div id="rpYukleSonuc" class="small mt-2"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-body p-0 table-responsive">
+              <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light"><tr>
+                  <th style="width:2rem"><input type="checkbox" class="form-check-input" id="rpHepsi" title="Tümünü seç"></th>
+                  <th>Tarih</th><th>Sıra no</th><th>Ekip başkanı</th><th>Görevli personel</th><th>Gidilen yer</th><th>Plaka</th><th>Saat</th><th>Rapor</th><th class="text-end">İşlem</th>
+                </tr></thead>
+                <tbody id="rpTablo"></tbody>
+              </table>
+            </div>
+            <div class="card-footer small text-body-secondary">Rapor taranıp yüklenince sıra numarasından ilgili göreve kendiliğinden bağlanır. Okunamayan rapor, satırdaki <i class="bi bi-paperclip"></i> düğmesiyle doğrudan o göreve bağlanabilir. Raporun metni ve "Görüldü" imzacısı Ayarlar → Görev sonu raporu bölümünden, göreve özel metin görev penceresinden değiştirilir.</div>
+          </div>
+          <input type="file" id="rpTekYukle" accept="image/jpeg,image/png" hidden>
+        </section>
+
         <section class="sekme" id="sekme-ayarlar" hidden>
           <form id="ayarForm" class="row g-3 mb-4">
             <div class="col-lg-6">
