@@ -124,7 +124,9 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
     için listedeki *Görev sonu raporları* düğmesi kullanılır. Rapor tarihi sayfanın üstünden
     değiştirilebilir (varsayılan: bugün).
   - Ekip başkanı görevli personel listesindeki ilk kişidir. İşletme/Yer ve görev sonucu
-    metni Ayarlar'da tanımlanır, gerekirse göreve özel değiştirilir. Antet logosu isteğe
+    metninin varsayılanı ("4342 Sayılı Mera Kanunu kapsamında…") Ayarlar'da kayıtlıdır ve
+    değiştirilebilir. Göreve özel metin görev penceresinden ya da yazdırma sayfasında metne
+    tıklanarak değiştirilir; metinden çıkınca o göreve kaydedilir (silinirse varsayılana döner). Antet logosu isteğe
     bağlıdır ve Ayarlar'dan yüklenir.
   - İmzalanıp taranan rapor, görev emirleri gibi yüklenir (elle ya da Drive). OCR raporu
     tanır, sıra numarasından (ve çıkış tarihinden) ilgili göreve bağlar;
