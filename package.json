@@ -1,6 +1,6 @@
 {
   "name": "gemis",
-  "version": "1.6.4",
+  "version": "1.6.5",
   "description": "GEMİS – Görev Emri İcmal Sistemi",
   "main": "src/server.js",
   "scripts": {

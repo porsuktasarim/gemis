@@ -197,6 +197,7 @@
                 <div class="col-auto"><label class="form-label small mb-0" for="rpDurum">Durum</label>
                   <select id="rpDurum" class="form-select form-select-sm"><option value="">Tümü</option><option value="bekliyor">Rapor bekleniyor</option><option value="yuklendi">Rapor yüklendi</option></select></div>
                 <div class="col-auto"><label class="form-label small mb-0" for="rpTarih">Rapor tarihi</label><input type="date" id="rpTarih" class="form-control form-control-sm"></div>
+                <div class="col-auto"><label class="form-label small mb-0" for="rpGoruldu">"Görüldü" (şube müdürü)</label><input id="rpGoruldu" class="form-control form-control-sm" list="kisiListe" style="min-width:13rem" placeholder="Görevdeki / varsayılan" title="Doldurulursa yazdırılan raporların hepsine bu kişi kaydedilir; varsayılandan farklıysa ünvan &quot;Şube Müdürü V.&quot; olur. Boş bırakılırsa her görevdeki ad (yoksa varsayılan) kullanılır."></div>
                 <div class="col-auto d-flex flex-wrap gap-2">
                   <button class="btn btn-primary btn-sm" id="rpSecilenYazdir" disabled><i class="bi bi-printer"></i> Seçilenleri yazdır (<span id="rpSecimSayisi">0</span>)</button>
                   <button class="btn btn-outline-primary btn-sm" id="rpTumunuYazdir"><i class="bi bi-printer"></i> Listedekilerin tümünü yazdır</button>
@@ -302,8 +303,9 @@
               <div class="card card-secondary card-outline mt-3"><div class="card-header"><h3 class="card-title">Görev sonu raporu</h3></div><div class="card-body row g-2">
                 <div class="col-12"><label class="form-label small mb-0">İşletme/Yer (varsayılan)</label><input class="form-control form-control-sm" name="raporIsletme" placeholder="Mera Kanunu kapsamındaki taşınmazlar"></div>
                 <div class="col-12"><label class="form-label small mb-0">Görev sonucu metni (varsayılan)</label><textarea class="form-control form-control-sm" name="raporSonuc" rows="2" placeholder="4342 Sayılı Mera Kanunu kapsamında gerekli kontrol ve incelemeler yapıldı."></textarea></div>
-                <div class="col-md-6"><label class="form-label small mb-0">"Görüldü" imzacısı adı</label><input class="form-control form-control-sm" name="raporGorulduAd" placeholder="Ad SOYAD"></div>
-                <div class="col-md-6"><label class="form-label small mb-0">"Görüldü" imzacısı ünvanı</label><input class="form-control form-control-sm" name="raporGorulduUnvan" placeholder="Şube Müdürü"></div>
+                <div class="col-md-6"><label class="form-label small mb-0">"Görüldü" – şube müdürü (varsayılan)</label><input class="form-control form-control-sm" name="raporGorulduAd" placeholder="Ad SOYAD" list="kisiListe"></div>
+                <div class="col-md-6"><label class="form-label small mb-0">"Görüldü" ünvanı</label><input class="form-control form-control-sm" name="raporGorulduUnvan" placeholder="Çayır, Mera ve Yem Bitkileri Şube Müdürü"></div>
+                <div class="col-12 form-text">Raporlarda varsayılan olarak bu kişi yazılır. Bir göreve (görev penceresi, Görev Sonu Raporları modülü ya da yazdırma sayfasından) başka biri yazılırsa ünvan kendiliğinden vekâlet ünvanına çevrilir: "… Şube Müdürü V."</div>
                 <div class="col-12"><label class="form-label small mb-0">Antet logosu (isteğe bağlı)</label>
                   <div class="d-flex gap-2 align-items-center">
                     <img id="raporLogoOn" alt="" style="height:48px;max-width:96px;object-fit:contain" hidden>
@@ -405,6 +407,8 @@
                 <div class="row g-2 mt-1">
                   <div class="col-12"><label class="form-label small mb-0">İşletme/Yer</label><input class="form-control form-control-sm" name="raporIsletme" placeholder="Boşsa Ayarlar'daki metin yazılır"></div>
                   <div class="col-12"><label class="form-label small mb-0">Görev sonucu</label><textarea class="form-control form-control-sm" name="raporMetni" rows="2" placeholder="Boşsa Ayarlar'daki metin yazılır"></textarea></div>
+                  <div class="col-12"><label class="form-label small mb-0">"Görüldü" (şube müdürü)</label><input class="form-control form-control-sm" name="raporGoruldu" list="kisiListe" placeholder="Boşsa Ayarlar'daki şube müdürü">
+                    <div class="form-text" id="gorulduUnvan"></div></div>
                   <div class="col-12 form-text">Ekip başkanı, görevli personel listesindeki ilk kişidir; sırayı listeden değiştirebilirsiniz. İmzalı rapor taranıp "Görev emri yükle" ya da Drive ile yüklendiğinde sıra numarasından bu göreve kendiliğinden bağlanır.</div>
                   <div class="col-12 d-flex flex-wrap gap-2">
                     <button type="button" class="btn btn-outline-dark btn-sm" id="raporYazdir"><i class="bi bi-printer"></i> Raporu yazdır</button>

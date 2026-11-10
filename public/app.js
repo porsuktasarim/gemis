@@ -197,6 +197,8 @@ function formDoldur(g) {
   // Göreve özel metin yoksa Ayarlar'daki varsayılan yazılı gelir; değiştirilirse bu göreve özel kaydedilir
   form.raporIsletme.value = g.raporIsletme || raporVarsayilan.raporIsletme || '';
   form.raporMetni.value = g.raporMetni || raporVarsayilan.raporSonuc || '';
+  form.raporGoruldu.value = g.raporGoruldu || raporVarsayilan.gorulduAd || '';
+  gorulduUnvanGoster();
   const raporGorseli = !!(g.raporDosya || g.raporDriveId);
   $('#raporDurum').innerHTML = g.raporYuklendi ? `<span class="badge text-bg-success">imzalı rapor yüklendi${raporGorseli ? '' : ' (görüntü saklanmadı)'}</span>` : '';
   $('#raporGorselAc').hidden = !raporGorseli;
@@ -212,14 +214,26 @@ function formDoldur(g) {
 // Ayarlar'daki rapor varsayılanları (görev penceresinde ön dolu gelir)
 let raporVarsayilan = {};
 async function raporVarsayilaniYukle() {
-  try { const a = await api('/api/ayarlar'); raporVarsayilan = { raporIsletme: a.raporIsletme || '', raporSonuc: a.raporSonuc || '' }; } catch { /* boş kalır */ }
+  try {
+    const a = await api('/api/ayarlar');
+    raporVarsayilan = { raporIsletme: a.raporIsletme || '', raporSonuc: a.raporSonuc || '', gorulduAd: a.raporGorulduAd || '', gorulduUnvan: a.raporGorulduUnvan || 'Şube Müdürü' };
+  } catch { /* boş kalır */ }
 }
+// "Görüldü": varsayılandan farklı biri yazılırsa ünvan "… Şube Müdürü V." olur (sunucudaki kuralın aynısı)
+const vekilUnvan = (u) => { u = String(u || 'Şube Müdürü').trim().replace(/\s*V\.?$/i, ''); return /Müdür(ü)?$/i.test(u) ? u.replace(/Müdür(ü)?$/i, 'Müdürü V.') : `${u} V.`; };
+function gorulduUnvanGoster() {
+  const ad = form.raporGoruldu.value.trim(), v = raporVarsayilan.gorulduAd || '';
+  const vekil = ad && sadeAd(ad) !== sadeAd(v);
+  $('#gorulduUnvan').textContent = `Raporda: ${vekil ? ad : (v || '(Ayarlar\'da ad girilmemiş)')} – ${vekil ? vekilUnvan(raporVarsayilan.gorulduUnvan) : (raporVarsayilan.gorulduUnvan || '')}`;
+}
+form.raporGoruldu.addEventListener('input', gorulduUnvanGoster);
 // Varsayılanla aynı metin göreve ayrıca yazılmaz; böylece Ayarlar'da metin değişince bu görev de güncel kalır
 function raporAlanlari() {
   const i = form.raporIsletme.value.trim(), m = form.raporMetni.value.trim();
   return {
     raporIsletme: i === (raporVarsayilan.raporIsletme || '').trim() ? '' : i,
-    raporMetni: m === (raporVarsayilan.raporSonuc || '').trim() ? '' : m
+    raporMetni: m === (raporVarsayilan.raporSonuc || '').trim() ? '' : m,
+    raporGoruldu: sadeAd(form.raporGoruldu.value) === sadeAd(raporVarsayilan.gorulduAd || '') ? '' : form.raporGoruldu.value.trim()
   };
 }
 
@@ -751,7 +765,7 @@ async function raporlariYukle() {
         <td class="small">${esc(yerYaz(g.yer) || g.yerHam || '')}</td>
         <td class="text-nowrap">${esc(g.plaka || '')}</td>
         <td class="text-nowrap small">${esc(g.cikis || '')}–${esc(g.donus || '')}</td>
-        <td>${durumHtml}${eksik.length ? `<div class="small text-danger">Eksik: ${esc(eksik.join(', '))}</div>` : ''}</td>
+        <td>${durumHtml}${g.raporGoruldu ? `<div class="small text-body-secondary" title="Görüldü imzacısı (vekâleten)">Görüldü: ${esc(g.raporGoruldu)} (V.)</div>` : ''}${eksik.length ? `<div class="small text-danger">Eksik: ${esc(eksik.join(', '))}</div>` : ''}</td>
         <td class="text-end text-nowrap">
           <button class="btn btn-outline-dark btn-sm rp-yazdir" title="Raporu yazdır"><i class="bi bi-printer"></i></button>
           <button class="btn btn-outline-success btn-sm rp-tek" title="İmzalı raporu bu göreve yükle"><i class="bi bi-paperclip"></i></button>
@@ -770,10 +784,18 @@ function rpSecimGuncelle() {
   const kutular = [...document.querySelectorAll('#rpTablo .rp-sec')];
   $('#rpHepsi').checked = kutular.length > 0 && kutular.every(k => k.checked);
 }
-const rpYazdir = (idler) => {
+const rpYazdir = async (idler) => {
   if (!idler.length) return bildir('Yazdırılacak görev yok.');
+  // "Görüldü" doldurulduysa yazdırılan görevlere kaydedilir (varsayılandan farklıysa vekâlet ünvanı)
+  const gor = $('#rpGoruldu').value.trim();
+  const sekme = gor ? window.open('about:blank', '_blank') : null;
+  if (gor) {
+    try { await api('/api/raporlar/goruldu', { method: 'POST', body: JSON.stringify({ idler, ad: gor }) }); raporlariYukle(); }
+    catch (e) { if (sekme) sekme.close(); return bildir('"Görüldü" kaydedilemedi: ' + e.message); }
+  }
   const t = $('#rpTarih').value;
-  window.open(`/rapor?id=${idler.join(',')}${t ? '&raporTarihi=' + t : ''}`, '_blank');
+  const adres = `/rapor?id=${idler.join(',')}${t ? '&raporTarihi=' + t : ''}`;
+  if (sekme) sekme.location = adres; else window.open(adres, '_blank');
 };
 const rpGorunenIdler = () => [...document.querySelectorAll('#rpTablo tr[data-id]')].map(tr => tr.dataset.id);
 

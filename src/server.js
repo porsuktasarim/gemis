@@ -8,7 +8,7 @@ const crypto = require('crypto');
 const { Gorev, Kisi, Ayar, Plaka } = require('./models');
 const { VARSAYILAN: SABLON_VARSAYILAN, ESKI_SAYI, imzaCoz } = require('./icmal/sablon');
 const { gorevOku } = require('./ocr');
-const { raporSayfasi, raporTani, siraNo, VARSAYILAN: RAPOR_VARSAYILAN } = require('./rapor');
+const { raporSayfasi, raporTani, siraNo, gorulduBilgisi, VARSAYILAN: RAPOR_VARSAYILAN } = require('./rapor');
 const { secimOku } = require('./secimOku');
 const { icmalUret, TURLER } = require('./icmal');
 const { excelUret, pdfUret } = require('./disaktar');
@@ -166,7 +166,7 @@ function gorevTemizle(b) {
   if (g.donus !== undefined) g.donus = saatNormal(g.donus);
   if (Array.isArray(g.personel)) g.personel = [...new Set(g.personel.map(s => s.trim()).filter(Boolean))];
   for (const k of ['_id', 'dosya', 'driveId', 'driveAd', 'ocrMetin', 'okunanUnvanlar', 'createdAt', 'updatedAt', 'raporDosya', 'raporDriveId', 'raporDriveAd', 'raporYuklendi']) delete g[k];
-  for (const k of ['raporMetni', 'raporIsletme']) if (typeof g[k] === 'string') g[k] = g[k].trim();
+  for (const k of ['raporMetni', 'raporIsletme', 'raporGoruldu']) if (typeof g[k] === 'string') g[k] = g[k].trim();
   return g;
 }
 
@@ -391,6 +391,28 @@ app.put('/api/gorevler/:id/rapor-metni', hata(async (req, res) => {
   g.raporMetni = metin && metin !== varsayilan ? metin : undefined;
   await g.save();
   res.json({ ok: true, metin: g.raporMetni || varsayilan });
+}));
+
+// "Görüldü" imzacısı (yazdırma sayfasından ya da toplu). Boş ya da varsayılan şube müdürüyle aynıysa
+// göreve yazılmaz (Ayarlar'daki varsayılan geçerli olur); farklıysa ünvan "Şube Müdürü V." olur.
+function gorulduYaz(g, ad, ayar) {
+  const a = String(ad ?? '').replace(/\s+/g, ' ').trim();
+  g.raporGoruldu = a && sade(a) !== sade(ayar.raporGorulduAd || '') ? a : undefined;
+}
+app.put('/api/gorevler/:id/rapor-goruldu', hata(async (req, res) => {
+  const g = await Gorev.findById(req.params.id);
+  if (!g) return res.status(404).json({ hata: 'Kayıt bulunamadı' });
+  const ayar = await ayarGetir();
+  gorulduYaz(g, req.body?.ad, ayar);
+  await g.save();
+  res.json({ ok: true, ...gorulduBilgisi(g, ayar) });
+}));
+app.post('/api/raporlar/goruldu', hata(async (req, res) => {
+  const idler = (Array.isArray(req.body?.idler) ? req.body.idler : []).filter(x => /^[a-f0-9]{24}$/i.test(x));
+  const ayar = await ayarGetir();
+  let n = 0;
+  for (const g of await Gorev.find({ _id: { $in: idler } })) { gorulduYaz(g, req.body?.ad, ayar); await g.save(); n++; }
+  res.json({ ok: true, guncellenen: n, ...gorulduBilgisi({ raporGoruldu: req.body?.ad }, ayar) });
 }));
 
 // Taranmış raporun bağlantısını kaldırır (Drive'daki dosyaya dokunulmaz; tekrar taramada yeniden bağlanabilir)

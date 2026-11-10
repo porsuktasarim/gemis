@@ -135,6 +135,11 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
   - İmzalanıp taranan rapor, görev emirleri gibi yüklenir (elle ya da Drive). OCR raporu
     tanır, sıra numarasından (ve çıkış tarihinden) ilgili göreve bağlar;
     yeni görev açmaz. Listede rapor yüklenen görevler işaretlenir.
+  - **"Görüldü" (şube müdürü):** varsayılan ad ve ünvan Ayarlar'dadır. Göreve başka biri
+    yazılırsa (görev penceresi, Görev Sonu Raporları modülünde toplu, ya da yazdırma
+    sayfasında ada tıklanarak) ünvan kendiliğinden vekâlet ünvanına çevrilir:
+    "Çayır, Mera ve Yem Bitkileri Şube Müdürü" → "… Şube Müdürü V.". Varsayılan ad
+    yeniden yazılır ya da alan boşaltılırsa varsayılana döner.
   - Görev emirleri PDF'ine *Taranmış görev sonu raporlarını da ekle* seçeneğiyle raporlar
     da eklenebilir (görüntü saklama açıksa ya da rapor Drive'dan geldiyse).
 

@@ -21,6 +21,7 @@ const GorevSchema = new mongoose.Schema({
   // Görev sonu raporu: göreve özel metin (boşsa Ayarlar'daki), imzalı taranmış raporun görüntüsü
   raporMetni: String,
   raporIsletme: String,
+  raporGoruldu: String,                         // "Görüldü" imzacısı; boşsa Ayarlar'daki şube müdürü
   raporDosya: String,                           // yerel kopya (görüntü saklama açıksa)
   raporDriveId: { type: String, index: true },
   raporDriveAd: String,

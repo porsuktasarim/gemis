@@ -26,6 +26,20 @@ function yerSatirlari(yer) {
   };
 }
 
+// "Görüldü" imzacısı: göreve ayrıca yazılmışsa o, yoksa Ayarlar'daki varsayılan şube müdürü.
+// Varsayılandan farklı biri imzalıyorsa ünvan vekâlet ünvanına çevrilir ("Şube Müdürü" → "Şube Müdürü V.").
+function vekilUnvan(unvan) {
+  const u = String(unvan || 'Şube Müdürü').trim().replace(/\s*V\.?$/i, '');
+  return /Müdür(ü)?$/i.test(u) ? u.replace(/Müdür(ü)?$/i, 'Müdürü V.') : `${u} V.`;
+}
+function gorulduBilgisi(g, ayar) {
+  const varsayilanAd = String(ayar?.raporGorulduAd || '').trim();
+  const varsayilanUnvan = ayarDegeri(ayar, 'raporGorulduUnvan');
+  const ad = String(g?.raporGoruldu || '').trim();
+  if (!ad || sade(ad) === sade(varsayilanAd)) return { ad: varsayilanAd, unvan: varsayilanUnvan, vekil: false };
+  return { ad, unvan: vekilUnvan(varsayilanUnvan), vekil: true };
+}
+
 function plakaTuru(plaka, plakalar) {
   const p = (plakalar || []).find(x => sade(x.plaka) === sade(plaka));
   return /özel|ozel|kiral/i.test(p?.aciklama || '') ? 'ozel' : 'resmi';
@@ -37,6 +51,7 @@ function birRapor(g, ayar, { kisiler, plakalar, raporTarihi }) {
   const yer = yerSatirlari(g.yer);
   const tur = g.plaka ? plakaTuru(g.plaka, plakalar) : '';
   const yil = (g.tarih || '').slice(0, 4) || new Date().getFullYear();
+  const gor = gorulduBilgisi(g, ayar);
   const imzalar = personel.map((ad, i) => `
       <div class="imza">
         <div class="imza-baslik">${i === 0 ? 'Ekip Başkanının' : 'Görevli Personelin'}<br>İmzası</div>
@@ -94,8 +109,8 @@ function birRapor(g, ayar, { kisiler, plakalar, raporTarihi }) {
   <div class="goruldu">
     <div>GÖRÜLDÜ</div>
     <div>. . / . . /${yil}</div>
-    <div>${esc(ayar.raporGorulduAd || '')}</div>
-    <div>${esc(ayarDegeri(ayar, 'raporGorulduUnvan'))}</div>
+    <div class="goruldu-ad" contenteditable="true" spellcheck="false" title="Tıklayıp değiştirebilirsiniz; varsayılandan farklı ad yazılırsa ünvan &quot;Şube Müdürü V.&quot; olur">${esc(gor.ad)}</div>
+    <div class="goruldu-unvan">${esc(gor.unvan)}</div>
   </div>
 
   <footer class="alt">
@@ -134,7 +149,8 @@ function raporSayfasi(gorevler, ayar, secenek = {}) {
   table.form td.sag { text-align: right; }
   .kalin { font-weight: bold; } .buyuk { font-size: 12pt; } .ince { font-size: 10pt; }
   .sonuc { margin: 12mm 0 0; min-height: 22mm; line-height: 1.4; outline: none; }
-  .sonuc:hover, .sonuc:focus { background: #fff8d6; box-shadow: 0 0 0 1mm #fff8d6; }
+  .sonuc:hover, .sonuc:focus, .goruldu-ad:hover, .goruldu-ad:focus { background: #fff8d6; box-shadow: 0 0 0 1mm #fff8d6; }
+  .goruldu-ad { outline: none; min-height: 1.5em; }
   /* İmza kısmı: başlık, ad soyad ve ünvan her imzacının kendi alanında ortalı */
   .imzalar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8mm 4mm; margin-top: 6mm; text-align: center; line-height: 1.35; }
   .imza-baslik { margin-bottom: 1mm; }
@@ -147,7 +163,7 @@ function raporSayfasi(gorevler, ayar, secenek = {}) {
   @media print {
     body { background: #fff; }
     .arac { display: none; }
-    .sonuc:hover, .sonuc:focus { background: none; box-shadow: none; }
+    .sonuc:hover, .sonuc:focus, .goruldu-ad:hover, .goruldu-ad:focus { background: none; box-shadow: none; }
     .sayfa { margin: 0; padding: 0; width: auto; min-height: calc(297mm - 26mm); box-shadow: none; break-after: page; page-break-after: always; }
     .sayfa:last-of-type { break-after: auto; page-break-after: auto; }
   }
@@ -156,7 +172,7 @@ function raporSayfasi(gorevler, ayar, secenek = {}) {
 <div class="arac">
   <button type="button" onclick="window.print()">Yazdır</button>
   <label>Rapor tarihi <input type="date" id="raporTarihi" value="${esc(secenek.raporTarihi || '')}"></label>
-  <span class="not">${gorevler.length} rapor · Açıklama metnine tıklayıp değiştirebilirsiniz; metinden çıkınca o göreve kaydedilir. <span id="kayitDurum"></span> Yazdırma penceresinde kâğıt A4, kenar boşlukları "Varsayılan", "Üstbilgi ve altbilgi" kapalı olmalıdır.</span>
+  <span class="not">${gorevler.length} rapor · Açıklama metnine ve "Görüldü" altındaki ada tıklayıp değiştirebilirsiniz; çıkınca o göreve kaydedilir. <span id="kayitDurum"></span> Yazdırma penceresinde kâğıt A4, kenar boşlukları "Varsayılan", "Üstbilgi ve altbilgi" kapalı olmalıdır.</span>
 </div>
 ${govde}
 <script>
@@ -177,7 +193,31 @@ ${govde}
     el.dataset.son = el.innerText.trim();
     el.addEventListener('blur', function () { kaydet(el); });
   });
-  window.addEventListener('beforeprint', function () { document.querySelectorAll('.sonuc').forEach(kaydet); });
+  // "Görüldü" imzacısı: ad değişince göreve kaydedilir, ünvan sunucudaki kurala göre güncellenir
+  function gorulduKaydet(el) {
+    var ad = el.innerText.replace(/\\s+/g, ' ').trim();
+    if (ad === el.dataset.son) return Promise.resolve();
+    var id = el.closest('section.sayfa').dataset.id;
+    if (!id) return Promise.resolve();
+    durum.textContent = 'Kaydediliyor…';
+    return fetch('/api/gorevler/' + id + '/rapor-goruldu', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ad: ad }) })
+      .then(function (r) { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+      .then(function (j) {
+        el.innerText = j.ad; el.dataset.son = j.ad;
+        el.parentNode.querySelector('.goruldu-unvan').textContent = j.unvan;
+        durum.textContent = '✓ Kaydedildi';
+      })
+      .catch(function (e) { durum.textContent = '⚠ Kaydedilemedi: ' + e.message; });
+  }
+  document.querySelectorAll('.goruldu-ad').forEach(function (el) {
+    el.dataset.son = el.innerText.trim();
+    el.addEventListener('blur', function () { gorulduKaydet(el); });
+    el.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
+  });
+  window.addEventListener('beforeprint', function () {
+    document.querySelectorAll('.sonuc').forEach(kaydet);
+    document.querySelectorAll('.goruldu-ad').forEach(gorulduKaydet);
+  });
   document.getElementById('raporTarihi').addEventListener('change', function () {
     var u = new URL(location.href); u.searchParams.set('raporTarihi', this.value); location.href = u.toString();
   });
@@ -202,4 +242,4 @@ function raporTani(metin) {
   return { belgeNo, tarih };
 }
 
-module.exports = { raporSayfasi, raporTani, VARSAYILAN: VARSAYILAN, siraNo };
+module.exports = { gorulduBilgisi, vekilUnvan, raporSayfasi, raporTani, VARSAYILAN: VARSAYILAN, siraNo };
