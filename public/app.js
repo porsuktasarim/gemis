@@ -17,7 +17,11 @@ window.addEventListener('unhandledrejection', (e) => arayuzHatasi(e.reason?.mess
 const tarihTR = (iso) => iso ? iso.split('-').reverse().join('.') : '';
 const tarihISO = (tr) => { const m = /(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(tr || ''); return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : ''; };
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const yerYaz = (yer) => (yer || []).map(g => [g.ilce, ...(g.mahalleler || [])].filter(Boolean).join('-')).join(', ');
+// Yer yazım kuralı (sunucudaki util.yerYaz ile aynı): "Sarıyer-Demirciköy/Bahçeköy, Üsküdar" — "Merkez" yazılmaz
+const merkezMi = (m) => /^merkez(mah(alles[iı])?)?$/.test(String(m || '').toLocaleLowerCase('tr-TR').replace(/[^a-zçğıöşü]/g, ''));
+const yerYaz = (yer) => (yer || [])
+  .map(g => [g.ilce, [...new Set((g.mahalleler || []).filter(m => m && !merkezMi(m)))].join('/')].filter(Boolean).join('-'))
+  .filter(Boolean).join(', ');
 const bildirim = new bootstrap.Toast($('#bildirim'), { delay: 3000 });
 const bildir = (m) => { $('#bildirim .toast-body').textContent = m; bildirim.show(); };
 

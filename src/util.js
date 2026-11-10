@@ -69,15 +69,23 @@ function yerAyristir(metin) {
   for (const p of parcalar) {
     const ilce = ilceBul(p);
     if (ilce) { akt = { ilce, mahalleler: [] }; gruplar.push(akt); continue; }
+    // "Sarıyer Demirciköy": ilçe ile mahalle arasında tire yerine boşluk
+    const bosluklu = /^(\S+)\s+(.+)$/.exec(p);
+    const ilk = bosluklu && ilceBul(bosluklu[1]);
+    if (ilk) { akt = { ilce: ilk, mahalleler: [trTitle(bosluklu[2])] }; gruplar.push(akt); continue; }
     if (!akt) { akt = { ilce: '', mahalleler: [] }; gruplar.push(akt); }
     akt.mahalleler.push(trTitle(p));
   }
   return gruplar;
 }
 
-// Görev listesi biçimi: "İlçe-Mahalle, İlçe2-Mahalle2-Mahalle3"
+// Yer yazım kuralı (tek satır): ilçe ile mahalleleri "-", aynı ilçenin mahalleleri "/",
+// ilçeler ", " ile ayrılır; "Merkez" yazılmaz.
+//   Sarıyer: Demirciköy, Bahçeköy, Merkez + Üsküdar: Merkez → "Sarıyer-Demirciköy/Bahçeköy, Üsküdar"
+const merkezMi = (m) => /^merkez(mah(alles[iı])?)?$/.test(sade(m));
+const mahalleYaz = (mahalleler) => [...new Set((mahalleler || []).filter(m => m && !merkezMi(m)))].join('/');
 const yerYaz = (gruplar) => (gruplar || [])
-  .map(g => [g.ilce, ...(g.mahalleler || [])].filter(Boolean).join('-')).join(', ');
+  .map(g => [g.ilce, mahalleYaz(g.mahalleler)].filter(Boolean).join('-')).filter(Boolean).join(', ');
 
 // Saat
 function dk(saat) {
@@ -130,6 +138,6 @@ const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').
 const plakaBosluksuz = (p) => (p || '').replace(/\s+/g, '').toUpperCase();
 
 module.exports = {
-  ILCELER, trUpper, trLower, trTitle, sade, levenshtein, benzer, ilceBul, yerAyristir, yerYaz,
+  ILCELER, trUpper, trLower, trTitle, sade, levenshtein, benzer, ilceBul, yerAyristir, yerYaz, mahalleYaz, merkezMi,
   dk, saatYaz, saatNormal, tarihTR, tarihISO, AYLAR, aylar, ayAraligiMetni, ayGunleri, esc, plakaBosluksuz
 };

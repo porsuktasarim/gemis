@@ -1,7 +1,7 @@
 // Görevlendirme ve Görev Sonu Raporu: her görev emri için A4 tek sayfa, yazdırmaya hazır HTML.
 // Rapor imzalatılıp taranınca yeniden yüklenir; OCR raporu tanır ve sıra numarasından göreve bağlar
 // (raporTani): "Taşıt Görev Emri Sıra No" ve "Göreve Çıkış Tarihi" alanlarından.
-const { esc, trUpper, sade } = require('./util');
+const { esc, trUpper, sade, mahalleYaz } = require('./util');
 
 const VARSAYILAN = {
   raporIsletme: 'Mera Kanunu kapsamındaki taşınmazlar',
@@ -22,7 +22,7 @@ function yerSatirlari(yer) {
   const y = (yer || []).filter(x => x && (x.ilce || x.mahalleler?.length));
   return {
     ilce: y.map(x => trUpper(x.ilce || '')).filter(Boolean).join('- '),
-    mahalle: y.map(x => (x.mahalleler || []).join(', ')).filter(Boolean).join('-')
+    mahalle: y.map(x => mahalleYaz(x.mahalleler)).filter(Boolean).join('-')   // aynı ilçenin mahalleleri "/"; Merkez yazılmaz
   };
 }
 

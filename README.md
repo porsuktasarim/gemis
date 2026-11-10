@@ -107,6 +107,10 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
     sütunda durdukları ve başlıkları (KONTROL EDEN, ONAYLAYAN…) bloktan okunur.
     `(@IMZA_1)` personel, `(@IMZA_2)` şube müdürü, `(@IMZA_3)` il müdür yardımcısı
     ünvanıyla yazılır.
+- **Yer yazımı:** ilçe ile mahalleleri "-", aynı ilçenin mahalleleri "/", ilçeler ", " ile
+  ayrılır; "Merkez" yazılmaz. Örnek: "Sarıyer Demirciköy-Bahçeköy-Merkez, Üsküdar-Merkez" →
+  `Sarıyer-Demirciköy/Bahçeköy, Üsküdar`. Görev listesi, görev formu, liste icmali ve görev
+  sonu raporunun Mahalle satırı bu kuralla yazılır.
 - **Plakalar** her yerde boşluksuz ve büyük harfle tutulur (`34ABC2159`).
   Eski "34 ABC 2159" yazımları açılışta kendiliğinden çevrilir.
 
