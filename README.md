@@ -143,6 +143,28 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
   - Görev emirleri PDF'ine *Taranmış görev sonu raporlarını da ekle* seçeneğiyle raporlar
     da eklenebilir (görüntü saklama açıksa ya da rapor Drive'dan geldiyse).
 
+## Ağ paylaşımı (kurum ağı)
+
+Görev emirleri ve imzalı görev sonu raporları ağdaki paylaşımlı bir klasörden de içe
+aktarılabilir (Ayarlar → *Ağ paylaşımı*). Alt klasörler 3 seviyeye kadar taranır; daha önce
+işlenen dosyalar atlanır. Görüntüler sunucuya kopyalanmaz (görüntü saklama açık değilse),
+gerektiğinde paylaşımdan okunur.
+
+- **Paylaşımlı klasör (Windows / SMB):** adres `\\sunucu\paylaşım\klasör` biçiminde girilir;
+  kullanıcı adı, parola ve gerekiyorsa etki alanı yazılır. Bağlantı uygulama içinden
+  `smbclient` ile kurulur; sunucuda ayrıca bağlama ya da ayrıcalıklı konteyner gerekmez.
+  Yalnızca okuma izni olan ayrı bir hesap kullanılması önerilir. Parola veritabanında
+  saklanır, arayüze geri gönderilmez; istenirse `AG_KULLANICI`, `AG_PAROLA`, `AG_ALAN`
+  ortam değişkenleriyle de verilebilir.
+- **Sunucuya bağlanmış klasör:** paylaşım sunucuda bağlanıp konteynere birim olarak
+  verilir (`docker-compose.yml` içindeki `- /mnt/gorev-emirleri:/ag:ro` satırı), Ayarlar'a
+  `/ag` yazılır.
+- *Bağlantıyı dene* düğmesi kaç görüntü bulunduğunu ve kaçının henüz içe aktarılmadığını
+  gösterir. Kaydedildikten sonra Görev Emirleri ekranında *Ağ klasöründen içe aktar* düğmesi
+  çıkar; otomatik tarama aralığı da verilebilir.
+- Uygulamanın çalıştığı sunucunun paylaşımı barındıran bilgisayara ağdan erişebilmesi
+  (SMB, TCP 445) gerekir.
+
 ## Arayüz
 
 Arayüz [AdminLTE 4](https://adminlte.io/themes/v4/) temasıyla hazırlanmıştır:

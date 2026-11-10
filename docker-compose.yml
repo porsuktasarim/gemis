@@ -22,6 +22,9 @@ services:
       - "1138:1138"
     volumes:
       - uploads:/data/uploads
+      # Ağ paylaşımı, "Sunucuya bağlanmış klasör" seçeneğiyle kullanılacaksa (Ayarlar'da yol: /ag).
+      # Windows/SMB paylaşımına Ayarlar'dan doğrudan bağlanılıyorsa bu satır gerekmez.
+      # - /mnt/gorev-emirleri:/ag:ro
 volumes:
   mongo-data:
   uploads:

@@ -1,6 +1,6 @@
 FROM node:20-bookworm-slim
 RUN apt-get update \
- && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-tur \
+ && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-tur smbclient \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package*.json ./

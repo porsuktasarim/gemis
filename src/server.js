@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 
-const { Gorev, Kisi, Ayar, Plaka } = require('./models');
+const { Gorev, Kisi, Ayar, Plaka, Islenen } = require('./models');
 const { VARSAYILAN: SABLON_VARSAYILAN, ESKI_SAYI, imzaCoz } = require('./icmal/sablon');
 const { gorevOku } = require('./ocr');
 const { raporSayfasi, raporTani, siraNo, gorulduBilgisi, VARSAYILAN: RAPOR_VARSAYILAN } = require('./rapor');
@@ -14,6 +14,7 @@ const { icmalUret, TURLER } = require('./icmal');
 const { excelUret, pdfUret } = require('./disaktar');
 const { yerAyristir, saatNormal } = require('./util');
 const drive = require('./drive');
+const ag = require('./ag');
 const elyazisi = require('./elyazisi');
 const { kanonikAd, adUnvanAyir, adBicim, unvanBul, plakaBicim } = require('./kisiler');
 const { sade } = require('./util');
@@ -238,12 +239,18 @@ function yerelKaydet(buf, ad) {
   return dosya;
 }
 
-// Önce yerel kopya (varsa), yoksa Drive'dan anlık indirme. Drive'dan gelen veri diske yazılmaz.
+// Kaynak kimliği: Google Drive dosya kimliği ya da "ag:<yol>" (ağ paylaşımı). İkisi de driveId alanında tutulur.
+async function kaynakIndir(id) {
+  if (ag.agKimligi(id)) return ag.indir(id, await ayarGetir());
+  return drive.indir(id);
+}
+
+// Önce yerel kopya (varsa), yoksa Drive'dan / ağ paylaşımından anlık okuma. Bu veri diske yazılmaz.
 async function gorselGetir(g) {
   if (g.dosya) {
-    try { return await fs.promises.readFile(path.join(UPLOAD_DIR, g.dosya)); } catch { /* Drive'a düş */ }
+    try { return await fs.promises.readFile(path.join(UPLOAD_DIR, g.dosya)); } catch { /* kaynağa düş */ }
   }
-  if (g.driveId) return drive.indir(g.driveId);
+  if (g.driveId) return kaynakIndir(g.driveId);
   return null;
 }
 
@@ -252,7 +259,7 @@ async function raporGorseliGetir(g) {
   if (g.raporDosya) {
     try { return await fs.promises.readFile(path.join(UPLOAD_DIR, g.raporDosya)); } catch { /* Drive'a düş */ }
   }
-  if (g.raporDriveId) return drive.indir(g.raporDriveId);
+  if (g.raporDriveId) return kaynakIndir(g.raporDriveId);
   return null;
 }
 
@@ -359,6 +366,8 @@ app.delete('/api/gorevler/:id', hata(async (req, res) => {
   const g = await Gorev.findByIdAndDelete(req.params.id);
   if (g?.dosya) fs.unlink(path.join(UPLOAD_DIR, g.dosya), () => {});
   if (g?.raporDosya) fs.unlink(path.join(UPLOAD_DIR, g.raporDosya), () => {});
+  // görevin kaynak dosyaları yeniden içe aktarılabilsin
+  if (g) await Islenen.deleteMany({ $or: [{ gorev: String(g._id) }, { _id: { $in: [g.driveId, g.raporDriveId].filter(Boolean) } }] });
   res.json({ ok: true });
 }));
 
@@ -420,6 +429,7 @@ app.delete('/api/gorevler/:id/rapor', hata(async (req, res) => {
   const g = await Gorev.findById(req.params.id);
   if (!g) return res.status(404).json({ hata: 'Kayıt bulunamadı' });
   if (g.raporDosya) fs.unlink(path.join(UPLOAD_DIR, g.raporDosya), () => {});
+  if (g.raporDriveId) await Islenen.deleteMany({ $or: [{ _id: g.raporDriveId }, { gorev: String(g._id), sonuc: /rapor/ }] });   // tekrar taramada yeniden bağlanabilsin
   g.raporDosya = undefined; g.raporDriveId = undefined; g.raporDriveAd = undefined; g.raporYuklendi = undefined;
   await g.save();
   res.json({ ok: true });
@@ -534,40 +544,60 @@ app.get('/api/oneriler', hata(async (req, res) => {
   });
 }));
 
-// ---------- Google Drive ----------
-const taramaDurumu = { calisiyor: false, son: null, sonuc: null, toplam: 0, islenen: 0 };
+// ---------- İçe aktarma: Google Drive ve ağ paylaşımı ----------
+// İki kaynak da aynı yoldan geçer: görüntüler listelenir, daha önce işlenmemiş olanlar bellekte okunur,
+// OCR'dan geçirilir; görev sonu raporu ise ilgili göreve bağlanır, değilse görev emri olarak kaydedilir.
+// Aynı anda tek tarama yürür; ilerleme /api/<kaynak>/durum ile izlenir.
+const KAYNAKLAR = {
+  drive: {
+    ad: 'Drive',
+    hazir: (ayar) => drive.tanimli() && !!drive.klasorKimligi(ayar.driveKlasor),
+    eksik: 'Ayarlar\'da Drive klasörü girilmemiş.',
+    bul: (ayar) => drive.gorselleriBul(drive.klasorKimligi(ayar.driveKlasor)),
+    otoDk: (ayar) => Number(ayar.driveOtoTaraDk) || 0
+  },
+  ag: {
+    ad: 'Ağ paylaşımı',
+    hazir: (ayar) => ag.tanimli(ayar),
+    eksik: 'Ayarlar\'da ağ paylaşımı tanımlanmamış.',
+    bul: (ayar) => ag.gorselleriBul(ayar),
+    otoDk: (ayar) => Number(ayar.agOtoTaraDk) || 0
+  }
+};
+const taramaDurumu = { calisiyor: false, kaynak: null, son: null, sonuc: null, toplam: 0, islenen: 0, sonTarama: {}, sonSonuc: {} };
 
-async function driveTara() {
-  if (taramaDurumu.calisiyor) throw new Error('Tarama zaten sürüyor.');
+async function kaynakTara(tur) {
+  const k = KAYNAKLAR[tur];
+  if (taramaDurumu.calisiyor) throw new Error('Başka bir tarama sürüyor.');
   const ayar = await ayarGetir();
-  const kok = drive.klasorKimligi(ayar.driveKlasor);
-  if (!kok) throw new Error('Ayarlar\'da Drive klasörü girilmemiş.');
-  taramaDurumu.calisiyor = true;
-  taramaDurumu.toplam = 0; taramaDurumu.islenen = 0;
-  const ozet = { bulunan: 0, yeni: 0, baglanan: 0, hata: [], kayitlar: [] };
+  if (!k.hazir(ayar)) throw new Error(k.eksik);
+  Object.assign(taramaDurumu, { calisiyor: true, kaynak: tur, toplam: 0, islenen: 0 });
+  const ozet = { kaynak: tur, bulunan: 0, yeni: 0, baglanan: 0, rapor: 0, hata: [], kayitlar: [] };
   try {
-    const dosyalar = await drive.gorselleriBul(kok);
+    const dosyalar = await k.bul(ayar);
     ozet.bulunan = dosyalar.length;
-    const islenmis = new Set([...(await Gorev.distinct('driveId')), ...(await Gorev.distinct('raporDriveId'))].filter(Boolean));
+    const islenmis = await islenmisKaynaklar();
     const baglam = await ocrBaglami();
+    const isaretle = (f, ad, kayit, sonuc) => Islenen.updateOne({ _id: f.id }, { $set: { ad, gorev: kayit ? String(kayit._id) : '', sonuc } }, { upsert: true });
     const yeniler = dosyalar.filter(x => !islenmis.has(x.id));
     taramaDurumu.toplam = yeniler.length;
     for (const f of yeniler) {
       taramaDurumu.islenen++;
       try {
-        const buf = await drive.indir(f.id);
+        const buf = await kaynakIndir(f.id);
         const ad = f.yol ? `${f.yol}/${f.name}` : f.name;
         const okunan = await gorevOku(buf, f.name, baglam);
         const r = raporTani(okunan.ocrMetin);
         if (r) {
           const { kayit, durum } = await raporBagla(r, { driveId: f.id, driveAd: ad, kaydet: ayar.gorselSakla ? () => yerelKaydet(buf, f.name) : null });
-          if (kayit) ozet.rapor = (ozet.rapor || 0) + 1; else ozet.hata.push(`${ad}: ${durum}`);
+          if (kayit) { ozet.rapor++; await isaretle(f, ad, kayit, durum); } else ozet.hata.push(`${ad}: ${durum}`);   // bağlanamayan rapor sonraki taramada yeniden denenir
           ozet.kayitlar.push({ id: kayit?._id, dosya: ad, durum, tarih: kayit?.tarih, rapor: true });
           continue;
         }
         const alanlar = { driveId: f.id, driveAd: ad, ...(ayar.gorselSakla ? { dosya: yerelKaydet(buf, f.name) } : {}) };
         const { kayit, durum } = await kaydaIsle(okunan, alanlar);
         if (durum.startsWith('mevcut')) ozet.baglanan++; else ozet.yeni++;
+        await isaretle(f, ad, kayit, durum);
         ozet.kayitlar.push({ id: kayit._id, dosya: ad, durum, tarih: kayit.tarih });
       } catch (e) { ozet.hata.push(`${f.name}: ${e.message}`); }
     }
@@ -577,19 +607,41 @@ async function driveTara() {
     taramaDurumu.calisiyor = false;
     taramaDurumu.son = new Date();
     taramaDurumu.sonuc = ozet;
+    taramaDurumu.sonTarama[tur] = taramaDurumu.son;
+    taramaDurumu.sonSonuc[tur] = ozet;
   }
   return ozet;
 }
 
+// Bir kaynağın durumu: o kaynağın son tarama sonucu; başka kaynak tararken "calisiyor" yine görünür
+async function islenmisKaynaklar() {
+  const [a, b, c] = await Promise.all([Gorev.distinct('driveId'), Gorev.distinct('raporDriveId'), Islenen.distinct('_id')]);
+  return new Set([...a, ...b, ...c].filter(Boolean));
+}
+
+function durumYaz(tur, ek) {
+  const buKaynak = taramaDurumu.kaynak === tur;
+  return {
+    ...ek,
+    calisiyor: taramaDurumu.calisiyor, digerKaynak: taramaDurumu.calisiyor && !buKaynak ? KAYNAKLAR[taramaDurumu.kaynak].ad : null,
+    son: taramaDurumu.sonTarama[tur] || null, sonuc: taramaDurumu.sonSonuc[tur] || null,
+    toplam: buKaynak ? taramaDurumu.toplam : 0, islenen: buKaynak ? taramaDurumu.islenen : 0
+  };
+}
+function taramaBaslat(tur) {
+  return hata(async (req, res) => {
+    if (taramaDurumu.calisiyor) return res.json({ basladi: false, calisiyor: true });
+    const ayar = await ayarGetir();
+    if (!KAYNAKLAR[tur].hazir(ayar)) return res.status(400).json({ hata: KAYNAKLAR[tur].eksik });
+    kaynakTara(tur).catch(e => console.error(`${KAYNAKLAR[tur].ad} taraması:`, e.message));
+    res.json({ basladi: true });
+  });
+}
+
 app.get('/api/drive/durum', hata(async (req, res) => {
   const ayar = await ayarGetir();
-  res.json({
-    tanimli: drive.tanimli(), eposta: drive.hesapEposta(), klasor: ayar.driveKlasor || '',
-    calisiyor: taramaDurumu.calisiyor, son: taramaDurumu.son, sonuc: taramaDurumu.sonuc,
-    toplam: taramaDurumu.toplam, islenen: taramaDurumu.islenen
-  });
+  res.json(durumYaz('drive', { tanimli: drive.tanimli(), eposta: drive.hesapEposta(), klasor: ayar.driveKlasor || '' }));
 }));
-
 app.post('/api/drive/test', hata(async (req, res) => {
   const id = drive.klasorKimligi(req.body?.klasor || (await ayarGetir()).driveKlasor);
   if (!id) return res.status(400).json({ hata: 'Klasör bağlantısı ya da kimliği giriniz.' });
@@ -597,38 +649,55 @@ app.post('/api/drive/test', hata(async (req, res) => {
   const gorseller = await drive.gorselleriBul(id);
   res.json({ ad: bilgi.name, gorselSayisi: gorseller.length });
 }));
+// Tarama arka planda yürür (Cloudflare gibi vekillerin 100 sn istek sınırına takılmaması için)
+app.post('/api/drive/tara', taramaBaslat('drive'));
 
-// Tarama arka planda yürür (Cloudflare gibi vekillerin 100 sn istek sınırına takılmaması için);
-// arayüz ilerlemeyi /api/drive/durum ile izler.
-app.post('/api/drive/tara', hata(async (req, res) => {
-  if (taramaDurumu.calisiyor) return res.json({ basladi: false, calisiyor: true });
+app.get('/api/ag/durum', hata(async (req, res) => {
   const ayar = await ayarGetir();
-  if (!drive.klasorKimligi(ayar.driveKlasor)) return res.status(400).json({ hata: 'Ayarlar\'da Drive klasörü girilmemiş.' });
-  driveTara().catch(e => console.error('Drive taraması:', e.message));
-  res.json({ basladi: true });
+  res.json(durumYaz('ag', { tanimli: ag.tanimli(ayar) }));
 }));
+// Bağlantı denemesi: formdaki (henüz kaydedilmemiş) değerlerle; parola girilmemişse kayıtlı parola kullanılır
+app.post('/api/ag/test', hata(async (req, res) => {
+  const kayitli = await ayarGetir();
+  const b = req.body || {};
+  const deneme = { ...kayitli, ...b, agParola: b.agParola || kayitli.agParola };
+  if (!ag.tanimli(deneme)) return res.status(400).json({ hata: deneme.agTur === 'klasor' ? 'Klasör yolunu giriniz.' : 'Paylaşım adresini \\\\sunucu\\paylaşım\\klasör biçiminde giriniz.' });
+  const gorseller = await ag.gorselleriBul(deneme);
+  const islenmis = await islenmisKaynaklar();
+  res.json({ gorselSayisi: gorseller.length, yeni: gorseller.filter(g => !islenmis.has(g.id)).length, ornek: gorseller.slice(0, 3).map(g => g.yol ? `${g.yol}/${g.name}` : g.name) });
+}));
+app.post('/api/ag/tara', taramaBaslat('ag'));
 
-// Otomatik tarama: her dakika ayarı kontrol eder
+// Otomatik tarama: her dakika iki kaynağın ayarını kontrol eder
 setInterval(async () => {
-  try {
-    if (mongoose.connection.readyState !== 1 || !drive.tanimli() || taramaDurumu.calisiyor) return;
-    const ayar = await ayarGetir();
-    const dk = Number(ayar.driveOtoTaraDk) || 0;
-    if (!dk || !ayar.driveKlasor) return;
-    if (taramaDurumu.son && Date.now() - taramaDurumu.son.getTime() < dk * 60000) return;
-    const o = await driveTara();
-    if (o.yeni || o.baglanan || o.hata.length) console.log(`Drive taraması: ${o.yeni} yeni, ${o.baglanan} bağlandı, ${o.hata.length} hata`);
-  } catch (e) { console.error('Otomatik Drive taraması:', e.message); }
+  if (mongoose.connection.readyState !== 1 || taramaDurumu.calisiyor) return;
+  let ayar;
+  try { ayar = await ayarGetir(); } catch { return; }
+  for (const [tur, k] of Object.entries(KAYNAKLAR)) {
+    try {
+      const dk = k.otoDk(ayar);
+      if (!dk || !k.hazir(ayar) || taramaDurumu.calisiyor) continue;
+      const son = taramaDurumu.sonTarama[tur];
+      if (son && Date.now() - son.getTime() < dk * 60000) continue;
+      const o = await kaynakTara(tur);
+      if (o.yeni || o.baglanan || o.rapor || o.hata.length) console.log(`${k.ad} taraması: ${o.yeni} yeni, ${o.baglanan} bağlandı, ${o.rapor} rapor, ${o.hata.length} hata`);
+    } catch (e) { console.error(`Otomatik ${k.ad} taraması:`, e.message); }
+  }
 }, 60000);
 
 // ---------- Ayarlar / Kişiler ----------
-app.get('/api/ayarlar', hata(async (req, res) => res.json(await ayarGetir())));
+// Ağ paylaşımı parolası arayüze gönderilmez; yalnızca kayıtlı olup olmadığı bildirilir
+const ayarDis = (a) => { const { agParola, ...kalan } = a || {}; return { ...kalan, agParolaVar: !!agParola || !!process.env.AG_PAROLA }; };
+app.get('/api/ayarlar', hata(async (req, res) => res.json(ayarDis(await ayarGetir()))));
 // Belge şablonlarının varsayılanları ve imza bloğundan algılanan imzacılar (Ayarlar ekranı için)
 app.get('/api/sablon-varsayilan', (req, res) => res.json(SABLON_VARSAYILAN));
 app.post('/api/imza-coz', (req, res) => res.json(imzaCoz(String(req.body?.html || ''))));
 app.put('/api/ayarlar', hata(async (req, res) => {
-  const b = { ...req.body }; delete b._id; delete b.__v;
-  res.json(await Ayar.findByIdAndUpdate('ayar', b, { new: true, upsert: true }));
+  const b = { ...req.body }; delete b._id; delete b.__v; delete b.agParolaVar;
+  // Parola alanı boş gönderilirse kayıtlı parola korunur; "agParolaSil" ile silinir
+  if (b.agParolaSil) b.agParola = ''; else if (!b.agParola) delete b.agParola;
+  delete b.agParolaSil;
+  res.json(ayarDis((await Ayar.findByIdAndUpdate('ayar', b, { new: true, upsert: true })).toObject()));
 }));
 app.get('/api/kisiler', hata(async (req, res) => res.json(await Kisi.find().sort({ ad: 1 }).lean())));
 app.put('/api/kisiler', hata(async (req, res) => {

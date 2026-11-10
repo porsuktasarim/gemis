@@ -15,8 +15,8 @@ const GorevSchema = new mongoose.Schema({
   cikis: String,                                // HH:MM
   donus: String,
   dosya: String,                                // elle yüklenen görüntünün dosya adı (yerel)
-  driveId: { type: String, index: true },       // Drive'dan alınan görüntünün dosya kimliği (görüntü sunucuda tutulmaz)
-  driveAd: String,                              // Drive'daki dosya adı / alt klasör yolu
+  driveId: { type: String, index: true },       // Görüntünün kaynak kimliği: Drive dosya kimliği ya da "ag:<yol>" (ağ paylaşımı); görüntü sunucuda tutulmaz
+  driveAd: String,                              // Kaynaktaki dosya adı / alt klasör yolu
   ocrMetin: String,
   // Görev sonu raporu: göreve özel metin (boşsa Ayarlar'daki), imzalı taranmış raporun görüntüsü
   raporMetni: String,
@@ -43,6 +43,11 @@ const KisiSchema = new mongoose.Schema({
 // Plaka listesi: OCR eşleştirmesi ve öneriler için. Onaylanan (kontrol edilen) görevlerden ya da Ayarlar'dan eklenir.
 const PlakaSchema = new mongoose.Schema({ plaka: { type: String, unique: true }, aciklama: String });
 
+// İçe aktarmada (Drive / ağ paylaşımı) başarıyla işlenen kaynak dosyalar. Böylece bir dosya, kaydı başka
+// bir dosyayla güncellense de (ör. aynı göreve iki rapor görüntüsü) her taramada yeniden işlenmez.
+// Görev silinince o görevin dosyaları bu listeden çıkarılır; yeniden içe aktarılabilir.
+const IslenenSchema = new mongoose.Schema({ _id: String, ad: String, gorev: String, sonuc: String }, { timestamps: true });
+
 const TatilSchema = new mongoose.Schema({ tarih: String, ad: String, yarim: Boolean }, { _id: false });
 const MdSchema = new mongoose.Schema({ ilce: String, mahalleler: [String], not: String }, { _id: false });
 
@@ -64,6 +69,14 @@ const AyarSchema = new mongoose.Schema({
   gorselSakla: { type: Boolean, default: false },                  // görüntülerin kopyası sunucuda tutulsun mu
   elYazisiMotoru: { type: String, default: 'paddle' },             // 'paddle' (servis varsa) | 'tesseract'
   driveOtoTaraDk: { type: Number, default: 0 },                    // otomatik tarama aralığı (dakika, 0 = kapalı)
+  // Ağ paylaşımı (kurum ağı): smb = \\sunucu\paylasim\klasor, klasor = sunucuya bağlanmış klasör yolu
+  agTur: { type: String, default: 'smb' },
+  agAdres: { type: String, default: '' },
+  agKullanici: { type: String, default: '' },
+  agAlan: { type: String, default: '' },                           // etki alanı (ör. KURUM), isteğe bağlı
+  agParola: { type: String, default: '' },                         // arayüze gönderilmez
+  agKlasor: { type: String, default: '' },
+  agOtoTaraDk: { type: Number, default: 0 },
   mesaiBas: { type: String, default: '08:30' },
   mesaiBit: { type: String, default: '17:00' },
   puantajKontrolTuru: { type: String, default: 'Mera Kanunu Uyg.' },
@@ -83,5 +96,6 @@ module.exports = {
   Gorev: mongoose.model('Gorev', GorevSchema),
   Kisi: mongoose.model('Kisi', KisiSchema),
   Plaka: mongoose.model('Plaka', PlakaSchema),
-  Ayar: mongoose.model('Ayar', AyarSchema)
+  Ayar: mongoose.model('Ayar', AyarSchema),
+  Islenen: mongoose.model('Islenen', IslenenSchema)
 };

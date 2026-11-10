@@ -101,7 +101,7 @@ async function gorevleriYukle() {
       <td class="small">${esc((Array.isArray(g.personel) ? g.personel : []).join(', '))}</td>
       <td>${g.ornek ? '<span class="badge text-bg-secondary">Örnek</span> ' : ''}${g.onayli ? '<span class="badge text-bg-success">Kontrol edildi</span>' : '<span class="badge text-bg-warning">Kontrol bekliyor</span>'}
           ${g.raporYuklendi ? '<i class="bi bi-file-earmark-check text-success" title="İmzalı görev sonu raporu yüklendi"></i>' : ''}
-          ${g.driveId ? '<i class="bi bi-google text-muted" title="Görüntü Drive\'da"></i>' : g.dosya ? '<i class="bi bi-image text-muted" title="Görüntü sunucuda"></i>' : '<i class="bi bi-image text-danger" title="Görüntü yok"></i>'}</td>
+          ${String(g.driveId || '').startsWith('ag:') ? '<i class="bi bi-hdd-network text-muted" title="Görüntü ağ paylaşımında"></i>' : g.driveId ? '<i class="bi bi-google text-muted" title="Görüntü Drive\'da"></i>' : g.dosya ? '<i class="bi bi-image text-muted" title="Görüntü sunucuda"></i>' : '<i class="bi bi-image text-danger" title="Görüntü yok"></i>'}</td>
       <td><button class="btn btn-sm btn-link p-0"><i class="bi bi-pencil"></i></button></td>
     </tr>`;
     } catch (e) {
@@ -607,7 +607,8 @@ async function ayarlariYukle() {
     while (p.length > 1 && !p[p.length - 1]) p.pop();
     return p.join('; ');
   }).join('\n');
-  driveDurumYukle();
+  agAyarGoster(a);
+  driveDurumYukle(); agDurumYukle();
   api('/api/sistem').then(d => {
     const e = d.elyazisi || {};
     $('#elyazisiDurum').innerHTML = e.acik
@@ -620,6 +621,8 @@ af.addEventListener('submit', async (e) => {
   const veri = {};
   for (const el of af.elements) if (el.name && el.name !== 'tatiller' && el.name !== 'mahalliDisi') veri[el.name] = el.type === 'checkbox' ? el.checked : el.value;
   veri.driveOtoTaraDk = Number(veri.driveOtoTaraDk) || 0;
+  veri.agOtoTaraDk = Number(veri.agOtoTaraDk) || 0;
+  veri.agParolaSil = agParolaSil;   // boş parola alanı kayıtlı parolayı silmez
   veri.sablonlar = sablonlar;
   veri.raporLogo = raporLogo;
   veri.ocrHaricAdlar = af.ocrHaricAdlar.value.split(',').map(s => s.trim()).filter(Boolean);
@@ -669,22 +672,25 @@ $('#driveTest').addEventListener('click', async () => {
   } catch (e) { $('#driveTestSonuc').innerHTML = `<span class="text-danger">${esc(e.message)}</span>`; }
 });
 
-// Drive taraması sunucuda arka planda yürür; ilerleme birkaç saniyede bir sorulur
+// Tarama (Drive ya da ağ paylaşımı) sunucuda arka planda yürür; ilerleme birkaç saniyede bir sorulur
 const bekle = (ms) => new Promise(r => setTimeout(r, ms));
-$('#driveTara').addEventListener('click', async () => {
-  const btn = $('#driveTara'); btn.disabled = true;
+async function taramaYurut(tur, btn) {
+  const ad = tur === 'ag' ? 'Ağ paylaşımı' : 'Drive';
+  btn.disabled = true;
   try {
-    const bas = await api('/api/drive/tara', { method: 'POST' });
+    const bas = await api(`/api/${tur}/tara`, { method: 'POST' });
     if (!bas.basladi && !bas.calisiyor) throw new Error('Tarama başlatılamadı.');
     let d;
     do {
       await bekle(2000);
-      d = await api('/api/drive/durum');
-      const ilerleme = d.toplam ? `${d.islenen}/${d.toplam} görüntü OCR'dan geçiriliyor…` : 'Drive klasörü taranıyor…';
+      d = await api(`/api/${tur}/durum`);
+      const ilerleme = d.digerKaynak ? `${d.digerKaynak} taraması sürüyor, bitmesi bekleniyor…`
+        : d.toplam ? `${d.islenen}/${d.toplam} görüntü OCR'dan geçiriliyor…` : `${ad} klasörü taranıyor…`;
       $('#yukleDurum').innerHTML = `<span class="spinner-border spinner-border-sm"></span> ${ilerleme}`;
     } while (d.calisiyor);
+    if (!bas.basladi) { btn.disabled = false; return taramaYurut(tur, btn); }   // başka tarama bitti, şimdi bu kaynak
     const o = d.sonuc || { bulunan: 0, yeni: 0, baglanan: 0, hata: [], kayitlar: [] };
-    const satir = [`Drive: ${o.bulunan} görüntü bulundu, ${o.yeni} yeni kayıt, ${o.baglanan} mevcut kayıt güncellendi${o.rapor ? `, ${o.rapor} görev sonu raporu bağlandı` : ''}.`];
+    const satir = [`${ad}: ${o.bulunan} görüntü bulundu, ${o.yeni} yeni kayıt, ${o.baglanan} mevcut kayıt güncellendi${o.rapor ? `, ${o.rapor} görev sonu raporu bağlandı` : ''}.`];
     if (o.bulunan && !o.yeni && !o.baglanan && !o.rapor && !o.hata.length) satir.push('Yeni görüntü yok; daha önce işlenenler atlandı.');
     o.kayitlar.forEach(k => satir.push(`${esc(k.dosya)}: ${esc(k.durum)}${k.tarih ? ` (${tarihTR(k.tarih)})` : ''}`));
     o.hata.forEach(h => satir.push(`<span class="text-danger">${esc(h)}</span>`));
@@ -693,6 +699,42 @@ $('#driveTara').addEventListener('click', async () => {
     await gorevleriYukle(); onerileriYukle();
   } catch (e) { $('#yukleDurum').innerHTML = `<span class="text-danger">${esc(e.message)}</span>`; }
   btn.disabled = false;
+}
+$('#driveTara').addEventListener('click', () => taramaYurut('drive', $('#driveTara')));
+$('#agTara').addEventListener('click', () => taramaYurut('ag', $('#agTara')));
+
+// ---------- Ağ paylaşımı ----------
+let agParolaSil = false;
+function agTurGoster() {
+  const klasor = $('#agTur').value === 'klasor';
+  document.querySelectorAll('.ag-smb').forEach(e => { e.hidden = klasor; });
+  document.querySelectorAll('.ag-klasor').forEach(e => { e.hidden = !klasor; });
+}
+$('#agTur').addEventListener('change', agTurGoster);
+function agAyarGoster(a) {
+  agParolaSil = false;
+  $('#agParola').value = '';
+  $('#agParola').placeholder = a.agParolaVar ? '•••••• kayıtlı' : 'parola';
+  $('#agParolaSil').hidden = !a.agParolaVar;
+  agTurGoster();
+}
+$('#agParolaSil').addEventListener('click', () => {
+  agParolaSil = true; $('#agParola').value = ''; $('#agParola').placeholder = 'Kaydet ile silinecek'; $('#agParolaSil').hidden = true;
+});
+async function agDurumYukle() {
+  try { const d = await api('/api/ag/durum'); $('#agTara').hidden = !d.tanimli; } catch { /* düğme gizli kalır */ }
+}
+$('#agTest').addEventListener('click', async () => {
+  $('#agTestSonuc').innerHTML = '<span class="spinner-border spinner-border-sm"></span> Deneniyor…';
+  try {
+    const r = await api('/api/ag/test', { method: 'POST', body: JSON.stringify({
+      agTur: af.agTur.value, agAdres: af.agAdres.value, agKullanici: af.agKullanici.value, agAlan: af.agAlan.value,
+      agParola: af.agParola.value, agKlasor: af.agKlasor.value
+    }) });
+    $('#agTestSonuc').innerHTML = `<span class="text-success"><i class="bi bi-check-circle"></i> Bağlantı tamam:</span> ${r.gorselSayisi} görüntü bulundu, ${r.yeni} tanesi henüz içe aktarılmamış.`
+      + (r.ornek.length ? `<br><span class="text-body-secondary">Örnek: ${r.ornek.map(esc).join(' · ')}</span>` : '')
+      + '<br><span class="text-body-secondary">Ayarları "Kaydet" ile saklayınız; ardından Görev Emirleri ekranındaki "Ağ klasöründen içe aktar" düğmesi görünür.</span>';
+  } catch (e) { $('#agTestSonuc').innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle"></i> ${esc(e.message)}</span>`; }
 });
 
 api('/api/sistem').then(d => {
@@ -702,7 +744,7 @@ api('/api/sistem').then(d => {
 api('/api/gorevler-aylar').then(({ aylar }) => {
   if (aylar.length && !aylar.some(a => a.ay === $('#gorevAy').value)) $('#gorevAy').value = aylar[0].ay;
 }).catch(() => {}).finally(gorevleriYukle);
-kisiSecimiYukle(); onerileriYukle(); driveDurumYukle();
+kisiSecimiYukle(); onerileriYukle(); driveDurumYukle(); agDurumYukle();
 
 
 // ---------- Görev Sonu Raporları modülü ----------

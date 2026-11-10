@@ -49,8 +49,8 @@
         <ul class="nav sidebar-menu flex-column" role="navigation" aria-label="Ana menü">
           <li class="nav-header">İŞLEMLER</li>
           <li class="nav-item"><a href="#" class="nav-link active" data-sekme="gorevler"><i class="nav-icon bi bi-truck"></i><p>Görev Emirleri</p></a></li>
-          <li class="nav-item"><a href="#" class="nav-link" data-sekme="icmaller"><i class="nav-icon bi bi-file-earmark-spreadsheet"></i><p>İcmaller</p></a></li>
           <li class="nav-item"><a href="#" class="nav-link" data-sekme="raporlar"><i class="nav-icon bi bi-clipboard-check"></i><p>Görev Sonu Raporları</p></a></li>
+          <li class="nav-item"><a href="#" class="nav-link" data-sekme="icmaller"><i class="nav-icon bi bi-file-earmark-spreadsheet"></i><p>İcmaller</p></a></li>
           <li class="nav-header">YÖNETİM</li>
           <li class="nav-item"><a href="#" class="nav-link" data-sekme="ayarlar"><i class="nav-icon bi bi-gear"></i><p>Ayarlar</p></a></li>
         </ul>
@@ -104,6 +104,7 @@
                   <label class="form-check-label small" for="gorevTumu">Tüm aylar</label>
                 </div>
                 <button class="btn btn-primary btn-sm" id="driveTara" hidden><i class="bi bi-google"></i> Drive'dan içe aktar</button>
+                <button class="btn btn-primary btn-sm" id="agTara" hidden><i class="bi bi-hdd-network"></i> Ağ klasöründen içe aktar</button>
                 <label class="btn btn-outline-primary btn-sm mb-0">
                   <i class="bi bi-upload"></i> Görev emri yükle (JPEG)
                   <input type="file" id="dosyaSec" accept="image/jpeg,image/png" multiple hidden>
@@ -252,6 +253,31 @@
               </div></div>
             </div>
             <div class="col-lg-6">
+              <div class="card card-info card-outline mb-3"><div class="card-header"><h3 class="card-title"><i class="bi bi-hdd-network me-1"></i> Ağ paylaşımı (kurum ağı)</h3></div><div class="card-body row g-2">
+                <div class="col-12 small text-body-secondary">Ağdaki paylaşımlı bir klasördeki görev emri ve imzalı görev sonu raporu görüntüleri (JPEG/PNG) içe aktarılır; alt klasörler de taranır (3 seviyeye kadar). Görüntüler Drive'daki gibi sunucuya kopyalanmaz, gerektiğinde paylaşımdan okunur. Daha önce işlenen dosyalar atlanır.</div>
+                <div class="col-12"><label class="form-label small mb-0">Bağlantı türü</label>
+                  <select class="form-select form-select-sm" name="agTur" id="agTur">
+                    <option value="smb">Paylaşımlı klasör (Windows / SMB): \\sunucu\paylaşım\klasör</option>
+                    <option value="klasor">Sunucuya bağlanmış klasör (Docker birimi): /ag</option>
+                  </select></div>
+                <div class="col-12 ag-smb"><label class="form-label small mb-0">Paylaşım adresi</label>
+                  <input class="form-control form-control-sm font-monospace" name="agAdres" placeholder="\\dosya-sunucusu\Ortak\Görev Emirleri"></div>
+                <div class="col-md-4 ag-smb"><label class="form-label small mb-0">Kullanıcı adı</label><input class="form-control form-control-sm" name="agKullanici" autocomplete="off" placeholder="okuma hesabı"></div>
+                <div class="col-md-3 ag-smb"><label class="form-label small mb-0">Etki alanı</label><input class="form-control form-control-sm" name="agAlan" autocomplete="off" placeholder="KURUM" title="İsteğe bağlı"></div>
+                <div class="col-md-5 ag-smb"><label class="form-label small mb-0">Parola</label>
+                  <div class="input-group input-group-sm">
+                    <input type="password" class="form-control" name="agParola" id="agParola" autocomplete="new-password">
+                    <button class="btn btn-outline-secondary" type="button" id="agParolaSil" title="Kayıtlı parolayı sil" hidden><i class="bi bi-trash"></i></button>
+                  </div></div>
+                <div class="col-12 ag-klasor" hidden><label class="form-label small mb-0">Klasör yolu (konteyner içinde)</label>
+                  <input class="form-control form-control-sm font-monospace" name="agKlasor" placeholder="/ag"></div>
+                <div class="col-md-6"><label class="form-label small mb-0">Otomatik tarama (dakika, 0 = kapalı)</label>
+                  <input type="number" min="0" step="5" class="form-control form-control-sm" name="agOtoTaraDk"></div>
+                <div class="col-md-6 d-flex align-items-end"><button class="btn btn-outline-secondary btn-sm" type="button" id="agTest"><i class="bi bi-plug"></i> Bağlantıyı dene</button></div>
+                <div class="col-12 form-text" id="agTestSonuc"></div>
+                <div class="col-12 form-text ag-smb">Bu klasörü yalnızca okuyabilen ayrı bir hesap kullanılması önerilir. Parola sunucuda saklanır, ekrana geri getirilmez; değiştirmek için yenisini yazmanız yeterlidir.</div>
+                <div class="col-12 form-text ag-klasor" hidden>Klasör, sunucuda <code>docker-compose.yml</code> ile konteynere bağlanır (README → Ağ paylaşımı).</div>
+              </div></div>
               <div class="card card-success card-outline"><div class="card-header"><h3 class="card-title"><i class="bi bi-google me-1"></i> Google Drive ve görüntüler</h3></div><div class="card-body row g-2">
                 <div class="col-12 small" id="driveHesap"></div>
                 <div class="col-12">
