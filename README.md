@@ -1,11 +1,18 @@
 # GEMİS – Görev Emri İcmal Sistemi
 
-Taşıt görev emri görüntülerinden (JPEG) aylık arazi icmallerini hazırlayan web
-uygulaması. Yapay zekâ kullanmaz. Görüntüler sunucuda Tesseract OCR (Türkçe)
-ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
+Taşıt görev emri görüntülerinden (JPEG/PNG) aylık arazi icmallerini ve her görev için
+Görevlendirme ve Görev Sonu Raporunu hazırlayan web uygulaması. Yapay zekâ ya da internet
+gerektirmez. Görüntüler sunucuda Tesseract OCR (Türkçe) ve yerel bir el yazısı OCR
+servisiyle okunur; eksik alanlar görüntünün yanındaki formdan tamamlanır.
 
-İcmaller EDYS şablonlarına uygun HTML olarak ve Excel olarak alınabilir.
-İcmale giren görev emirlerinin görüntüleri tek PDF olarak indirilebilir.
+- İcmaller EDYS şablonlarına uygun HTML olarak ve Excel olarak alınır.
+- Görev sonu raporları görev emrinden kendiliğinden hazırlanır, yazdırılır; imzalı tarama
+  yüklenince ilgili göreve bağlanır.
+- Görüntüler elle, Google Drive'dan ya da kurum ağındaki paylaşımlı bir klasörden alınır.
+- İcmale giren görev emirlerinin (ve istenirse imzalı raporların) görüntüleri tek PDF
+  olarak indirilebilir.
+
+Menü: **Görev Emirleri**, **Görev Sonu Raporları**, **İcmaller**, **Ayarlar**.
 
 ## Özellikler
 
@@ -30,24 +37,22 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
     | Dönüş saati | 0 | 2 |
     | Belge no | 0 | 0 |
 
-    El yazısı okumaları hâlâ güvenilir değildir; bazen yanlış değer de çıkar (ör. 08:30 yerine 07:30). Bu yüzden her kayıt kontrol edilmelidir. Okunamayan alanlar "Seçerek oku" ile ya da elle tamamlanır.
-  - El yazısı alanlar (sürücü, plaka, saatler, belge no) çoğunlukla okunamaz.
-    Bu alanlar formdan girilir; daha önce girilen plaka ve kişiler öneri olarak
-    gelir.
+    El yazısı okumaları hâlâ güvenilir değildir; bazen yanlış değer de çıkar (ör. 08:30 yerine 07:30). Bu yüzden her kayıt kontrol edilmelidir. Okunamayan alanlar "Seçerek oku" ile ya da elle tamamlanır; daha önce girilen plaka ve kişiler öneri olarak gelir.
   - Dosya adında tarih varsa (`2026_10_13.jpg`, `13.10.2026.jpg`) görev tarihi
     oradan alınır.
 - **Seçerek oku**
-  - Düzenleme penceresinde bir alan seçilir (Sayı, Belge no, Gideceği yer, Personel, Sürücü, Plaka, Çıkış, Dönüş). Ardından görüntüde o alanın bulunduğu bölge fareyle ya da parmakla çerçevelenir.
+  - Düzenleme penceresinde bir alan seçilir (Belge no, Gideceği yer, Personel, Sürücü, Plaka, Çıkış, Dönüş). Ardından görüntüde o alanın bulunduğu bölge fareyle ya da parmakla çerçevelenir.
   - Yalnızca çerçevelenen parça okunur ve alana yazılır.
   - El yazısı alanlarda yanlış değer yazılmaması için sonuç yalnızca bilinen kişi ya da plaka biçimine uyuyorsa yazılır; uymazsa okunan metin gösterilir.
   - Görüntüsü sunucuda saklanmayan kayıtlarda görüntü bilgisayardan açılabilir. Dosya sunucuya kaydedilmez, yalnızca seçilen parça okunmak üzere gönderilir.
 - **Google Drive'dan içe aktarma**
   - Drive'daki görev emirleri klasörü ve alt klasörleri taranır. Yeni JPEG/PNG'ler OCR'dan geçirilip kayıt olarak eklenir.
   - Tarama düğmeyle ya da belirli aralıklarla otomatik yapılır.
-  - Daha önce işlenen dosyalar Drive dosya kimliğinden tanınır, tekrar eklenmez.
+  - Daha önce işlenen dosyalar tanınır, tekrar eklenmez (aynı göreve ait ikinci bir görüntü de her taramada yeniden okunmaz). Görev silinirse dosyaları yeniden içe aktarılabilir.
+  - Kurum ağındaki paylaşımlı klasörden içe aktarma için bkz. *Ağ paylaşımı*.
 - **Görüntü saklama seçeneği**
   - Varsayılan olarak görüntüler sunucuya kaydedilmez. OCR bellekte yapılır, Tesseract'a stdin üzerinden verilir.
-  - Drive'dan gelen görüntüler, görüntüleme ve PDF için her seferinde Drive'dan anlık alınır.
+  - Drive'dan ya da ağ paylaşımından gelen görüntüler, görüntüleme ve PDF için her seferinde kaynağından anlık alınır.
   - Elle yüklenen görüntüler yalnızca OCR'dan geçer.
   - İstenirse Ayarlar'dan "Görüntüleri sunucuda sakla" açılarak kopya tutulabilir.
 - **Gideceği yer ayrıştırma**
@@ -79,7 +84,7 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
   - Listede olmayan adlar ve plakalar işaretlenir.
   - OCR benzer adlar arasında karar verirken belgedeki ünvanı ve görevli listesini dikkate alır.
 - **Belge no**
-  - Görev emirleri belge no ile izlenir. Aynı belge yeniden yüklendiğinde yeni kayıt açılmaz, mevcut kayıt güncellenir.
+  - Görev emirleri 6 haneli belge no (taşıt görev emri sıra no) ile izlenir. Aynı belge yeniden yüklendiğinde yeni kayıt açılmaz, mevcut kayıt güncellenir.
 - **İcmaller**
 
   | İcmal | Kapsam |
@@ -113,7 +118,6 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
   sonu raporunun Mahalle satırı bu kuralla yazılır.
 - **Plakalar** her yerde boşluksuz ve büyük harfle tutulur (`34ABC2159`).
   Eski "34 ABC 2159" yazımları açılışta kendiliğinden çevrilir.
-
 - **Görevlendirme ve Görev Sonu Raporu**
   - Kenar menüdeki **Görev Sonu Raporları** modülünde ay ve personele göre görevler, her
     görevin rapor durumu (yüklendi / bekleniyor) ve eksik bilgileri listelenir. Raporlar
@@ -125,14 +129,18 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
     görev konusu, ilçe/mahalle, çıkış tarihi ve saatleri, plaka, görevli personelin imza
     alanları, "Görüldü" bölümü) yazdırmaya hazır olarak üretilir.
   - Tek görev için düzenleme penceresindeki *Raporu yazdır*, seçili ayın bütün görevleri
-    için listedeki *Görev sonu raporları* düğmesi kullanılır. Rapor tarihi sayfanın üstünden
-    değiştirilebilir (varsayılan: bugün).
+    için Görev Emirleri listesindeki *Görev sonu raporları* düğmesi de kullanılabilir. Rapor
+    tarihi sayfanın üstünden değiştirilebilir (varsayılan: bugün).
+  - Biçim: sıra no 6 hane (051934), tarihler 06.10.2026; ilk iki satır çerçevesiz; sıra no
+    ve etiketler sola, rapor tarihi sağa yaslı; çıkış tarihi, saatler, plaka, X ve imza
+    kısmı ortalı; sağ altta şube adı. Plaka listesinde açıklamasında "özel" ya da "kiralık"
+    geçen araç Özel, diğerleri Resmi işaretlenir.
   - Ekip başkanı görevli personel listesindeki ilk kişidir. İşletme/Yer ve görev sonucu
     metninin varsayılanı ("4342 Sayılı Mera Kanunu kapsamında…") Ayarlar'da kayıtlıdır ve
     değiştirilebilir. Göreve özel metin görev penceresinden ya da yazdırma sayfasında metne
-    tıklanarak değiştirilir; metinden çıkınca o göreve kaydedilir (silinirse varsayılana döner). Antet logosu isteğe
-    bağlıdır ve Ayarlar'dan yüklenir.
-  - İmzalanıp taranan rapor, görev emirleri gibi yüklenir (elle ya da Drive). OCR raporu
+    tıklanarak değiştirilir; metinden çıkınca o göreve kaydedilir (silinirse varsayılana
+    döner). Antet logosu isteğe bağlıdır ve Ayarlar'dan yüklenir.
+  - İmzalanıp taranan rapor, görev emirleri gibi yüklenir (elle, Drive ya da ağ paylaşımı). OCR raporu
     tanır, sıra numarasından (ve çıkış tarihinden) ilgili göreve bağlar;
     yeni görev açmaz. Listede rapor yüklenen görevler işaretlenir.
   - **"Görüldü" (şube müdürü):** varsayılan ad ve ünvan Ayarlar'dadır. Göreve başka biri
@@ -141,7 +149,7 @@ ile okunur, eksik alanlar görüntünün yanındaki formdan tamamlanır.
     "Çayır, Mera ve Yem Bitkileri Şube Müdürü" → "… Şube Müdürü V.". Varsayılan ad
     yeniden yazılır ya da alan boşaltılırsa varsayılana döner.
   - Görev emirleri PDF'ine *Taranmış görev sonu raporlarını da ekle* seçeneğiyle raporlar
-    da eklenebilir (görüntü saklama açıksa ya da rapor Drive'dan geldiyse).
+    da eklenebilir (görüntü saklama açıksa ya da rapor Drive'dan / ağ paylaşımından geldiyse).
 
 ## Ağ paylaşımı (kurum ağı)
 
@@ -178,7 +186,7 @@ AdminLTE, Bootstrap Icons ve OverlayScrollbars npm paketlerinden sunulur. İnter
 
 | Servis | Görev |
 |---|---|
-| `app` | Node.js uygulaması. Tesseract OCR imajın içindedir. |
+| `app` | Node.js uygulaması. Tesseract OCR ve ağ paylaşımı için `smbclient` imajın içindedir. |
 | `mongo` | MongoDB veritabanı. |
 | `ocr-el` | El yazısı OCR servisi (Python, PaddleOCR modelleri, ~600 MB imaj). |
 
@@ -234,6 +242,11 @@ MongoDB 5 ve üstü AVX destekli işlemci ister. `docker compose logs mongo`
 erişimini kısıtladığı için kopyalama eski yönteme geçer. Gerekirse .xlsx/.html
 indirme seçenekleri kullanılmalıdır.
 
+> **Dikkat:** Uygulamada henüz kullanıcı girişi yoktur; adrese ulaşabilen herkes kayıtları
+> görebilir ve değiştirebilir. Yalnızca güvenilen bir ağda çalıştırılmalı ya da önüne
+> parolalı bir vekil sunucu (ör. Coolify/Cloudflare Access) konmalıdır. Kullanıcı girişi
+> yapılacaklar listesindedir (`TODO.md`).
+
 ### Coolify ile yayınlama
 
 Uygulama 1138 portunda çalışır ("Görev Emri İcmal Sistemi" ebced değeri).
@@ -270,18 +283,24 @@ MONGO_URL=mongodb://localhost:27017/gemis npm start
 
 1. **Ayarlar** ekranında şunlar girilmelidir:
    - Şube
-   - EDYS sayı parçaları
    - Resmî tatiller (dini bayram tarihleri her yıl Resmî Gazete'den
      doğrulanmalıdır)
    - Mahalli dışı yerler
    - Kişi listesi (`Ad SOYAD; Görevi; Ünvanı`). Bu liste OCR'ın personel ve sürücü adlarını eşleştirmesi için de gereklidir.
+   - Plaka listesi (`Plaka; Açıklama`)
+   - Belge şablonları: her icmalin EDYS sayı satırı ve imza bloğu (varsayılanlar hazırdır)
+   - Görev sonu raporu: işletme/yer ve görev sonucu metni, "Görüldü" şube müdürünün adı ve
+     ünvanı, isteğe bağlı antet logosu
+   - Görüntü kaynağı (isteğe bağlı): Google Drive klasörü ya da ağ paylaşımı
 
-   İmzacı adları girilmez: HTML çıktılarında imza alanları EDYS şablonundaki (@IMZA_1/2/3) olarak kalır; Excel çıktısında imza satırlarına yalnızca ünvanlar yazılır.
+   İcmallerde imzacı adları girilmez: HTML çıktılarında imza alanları EDYS şablonundaki (@IMZA_1/2/3) olarak kalır; Excel çıktısında imza satırlarına yalnızca ünvanlar yazılır. Görev sonu raporunda ise imzacılar kâğıda basıldığı için görevlilerin adları ve "Görüldü" şube müdürünün adı yazılır.
 2. Denemek için **"Örnek (uydurma) veriyi içe aktar"** ile Ekim 2026'ya ait 10
    uydurma görev yüklenebilir.
 3. **Görev Emirleri** sekmesinde JPEG'ler yüklenir. Her kayıt açılıp kontrol
    edilir, eksikler tamamlanır ve "Kontrol ettim" işaretlenir.
-4. **İcmaller** sekmesinde tür ve ay seçilip "Oluştur"a basılır. Uyarı
+4. **Görev Sonu Raporları** sekmesinde ay seçilip raporlar yazdırılır; imzalanıp taranan
+   raporlar aynı sekmeden yüklenir.
+5. **İcmaller** sekmesinde personel, tür ve ay seçilip "Oluştur"a basılır. Uyarı
    kutusunda eksik alanlar ve cetvele alınmayan yerler listelenir.
 
 ## Varsayılan veriler
@@ -299,16 +318,22 @@ yalnızca kurulduğu bilgisayardaki Docker birimlerinde tutar.
 ## Klasör yapısı
 
 ```
-src/server.js        API ve statik dosyalar
+src/server.js        API, içe aktarma (Drive / ağ paylaşımı) ve statik dosyalar
 src/ocr.js           OCR sonuçlarından alan çıkarma ve eşleştirme
 src/zon.js           Bölgesel okuma (tablo çizgileri, etiketler, hücreler)
 src/elyazisi.js      El yazısı OCR servisine bağlantı
 src/secimOku.js      Seçerek oku
-ocr-el/              El yazısı OCR servisi (PaddleOCR / RapidOCR, Python)
-src/util.js          Türkçe metin, tarih, ilçe/mahalle ayrıştırma
-src/icmal/           İcmal HTML/Excel üreticileri
+src/kisiler.js       Ad/ünvan ayırma, kişi eşleştirme, plaka biçimi
+src/duzelt.js        Eski kayıtların alan türlerini düzeltme
+src/rapor.js         Görevlendirme ve Görev Sonu Raporu (yazdırma sayfası, taramayı tanıma)
+src/drive.js         Google Drive (hizmet hesabı, salt okuma)
+src/ag.js            Ağ paylaşımı (SMB / bağlanmış klasör)
+src/util.js          Türkçe metin, tarih, ilçe/mahalle ayrıştırma ve yazımı
+src/icmal/           İcmal HTML/Excel üreticileri; sablon.js: EDYS sayı satırı ve imza blokları
 src/disaktar.js      .xlsx ve PDF üretimi
 src/models.js        MongoDB şemaları ve varsayılan ayarlar
 public/              Arayüz (AdminLTE 4 / Bootstrap 5)
+ocr-el/              El yazısı OCR servisi (PaddleOCR / RapidOCR, Python)
 seed/varsayilan.js   Tatiller, mahalli dışı yerler, uydurma örnek veriler
+TODO.md              Yapılacaklar
 ```
